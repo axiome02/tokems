@@ -17,7 +17,7 @@ def test_etancheite():
     state.team_channels[1].append("MESSAGE_PRIVE_EQUIPE_1")
 
     # joueur 0 est dans l'equipe 0 ; l'equipe 1 est adverse
-    v = vue_pour(state, 0, ["TAKE", "PASS"])
+    v = vue_pour(state, 0)
     blob = str(dataclasses.asdict(v))
 
     assert v.mon_signal == "banane"                 # je vois MON signal
@@ -32,5 +32,5 @@ def test_carre_annonce_par_arbitre():
     state = setup(cfg, ["bot"] * 4)
     from kems.engine.cards import COULEURS, Card
     state.hands[0] = [Card(3, c) for c in COULEURS]
-    v = vue_pour(state, 0, ["PASS"])
+    v = vue_pour(state, 0)
     assert v.jai_un_carre is True

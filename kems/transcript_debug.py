@@ -29,23 +29,29 @@ def rendre_debug(state: GameState, usage: dict | None = None) -> str:
         for ligne in state.team_channels.get(equipe, []):
             L.append(f"   {ligne}")
 
-    # --- trace decision par decision ---
+    # --- decision par decision : les etapes de la timeline qui portent une action ---
     L.append(f"\n{t(lang, 'detailed_run_title')}")
     tour_courant = None
     phase_courante = None
-    for e in state.trace:
+    for e in state.timeline:
+        if "action" not in e:
+            continue
         if e["tour"] != tour_courant:
             tour_courant = e["tour"]
             phase_courante = None
             entete = (t(lang, "negotiation_header") if e["tour"] == 0
                       else t(lang, "manche_tour_header", manche=e.get("manche", 1), tour=e["tour"]))
             L.append(f"\n{'─' * 60}\n=== {entete} ===")
-        if e["phase"] != phase_courante:
-            phase_courante = e["phase"]
+        # meme granularite que l'ancienne trace : SWAP/PASS -> EXCHANGE, MESSAGE -> DISCUSSION
+        phase = {"SWAP": "EXCHANGE", "PASS": "EXCHANGE", "SYSTEM": "EXCHANGE",
+                 "MESSAGE": "DISCUSSION"}.get(e["type"], e["type"])
+        if phase != phase_courante:
+            phase_courante = phase
             L.append("\n" + t(lang, "phase_header", phase=phase_courante))
 
+        joueur = state.players[e["pid"]]
         carre = t(lang, "has_square_tag") if e["carre"] else ""
-        L.append(f"\n  > {e['nom']} ({t(lang, 'team_word', equipe=e['equipe'])}){carre}")
+        L.append(f"\n  > {joueur.nom} ({t(lang, 'team_word', equipe=joueur.equipe)}){carre}")
         L.append(f"      {t(lang, 'hand_label')}{' '.join(e['main'])}")
         L.append(f"      {t(lang, 'center_label')}{' '.join(e['centre'])}")
         L.append(f"      {t(lang, 'action_label')}{e['action']}")

@@ -90,23 +90,19 @@ def _ordre(state: GameState) -> list[int]:
     return ordre
 
 
-def _trace(state: GameState, phase: str, pid: int, view, action_str: str, agent) -> None:
-    """Enregistre une decision complete pour l'observateur (main, centre, prompt, reponse brute)."""
+def _extras_decision(view, agent, action_str: str) -> dict:
+    """Extras attaches a l'etape de timeline qui porte une DECISION : l'action decidee, la main
+    du decideur au moment de decider, et l'echange LLM brut (prompt, reponse). Flux
+    d'observabilite UNIQUE : le transcript debug filtre la timeline sur la presence de `action`
+    (le dashboard, lui, ignore les champs lourds — voir dashboard._instantane)."""
     io = getattr(agent, "last_io", None)
-    state.trace.append({
-        "tour": state.tour,
-        "manche": state.manche,
-        "phase": phase,
-        "pid": pid,
-        "nom": state.players[pid].nom,
-        "equipe": state.equipe_de(pid),
+    return {
+        "action": action_str,
         "main": [str(c) for c in view.ma_main],
         "carre": view.jai_un_carre,
-        "centre": [str(c) for c in view.centre],
-        "action": action_str,
         "prompt_user": io[1] if io else None,
         "reponse_brute": io[2] if io else None,
-    })
+    }
 
 
 def negotiation(state: GameState, agents: dict, equipes: tuple[int, ...] | None = None) -> None:
@@ -134,19 +130,19 @@ def negotiation(state: GameState, agents: dict, equipes: tuple[int, ...] | None 
         scelle = False
         for nt in range(state.config.max_tours_negociation):
             pid = joueurs[nt % len(joueurs)]
-            view = vue_pour(state, pid, ["NEGOTIATE"], nego_proposition=proposition,
+            view = vue_pour(state, pid, nego_proposition=proposition,
                             nego_declencheur=declencheur)
             n = agents[pid].negotiate(view)
             nom = state.players[pid].nom
             if n.message:
                 state.team_channels[equipe].append(f"{nom}: {n.message}")
             accord_mot = t(state.config.lang, "yes_word" if n.accord else "no_word")
-            _trace(state, "NEGOTIATION", pid, view,
-                   f"MESSAGE='{n.message}' PROPOSITION='{n.proposition}' "
-                   f"DECLENCHEUR='{n.declencheur}' ACCORD={accord_mot}", agents[pid])
             rules.etape(state, "NEGOTIATION", pid,
                         t(state.config.lang, "negotiating", nom=nom), prive=n.message,
-                        proposition=n.proposition, declencheur=n.declencheur, accord=n.accord)
+                        proposition=n.proposition, declencheur=n.declencheur, accord=n.accord,
+                        **_extras_decision(view, agents[pid],
+                                           f"MESSAGE='{n.message}' PROPOSITION='{n.proposition}' "
+                                           f"DECLENCHEUR='{n.declencheur}' ACCORD={accord_mot}"))
             # Accord valable seulement sur une proposition faite par le coequipier — explicite
             # (ACCORD: OUI) ou tacite : recopier mot pour mot la proposition sur la table, c'est
             # la garder. Sans cette seconde branche les modeles s'echangent la meme phrase
@@ -181,25 +177,27 @@ def exchange_phase(state: GameState, agents: dict) -> None:
                 # Le joueur decide quand meme s'il garde ou casse son carre : ce n'est
                 # pas au moteur de juger a sa place que le garder est la seule option sensee.
                 rules.ouvrir_episode(state, pid)
-            view = vue_pour(state, pid, ["TAKE", "PASS"])
+            view = vue_pour(state, pid)
             action = agents[pid].decide_card(view)
             if isinstance(action, Take):
                 if rules.valider_et_appliquer_echange(state, pid, action):
                     rules._log(state, "SWAP", pid,
                                t(state.config.lang, "takes_discards", nom=nom,
                                  prise=str(action.from_center), repose=str(action.discard)),
-                               prise=str(action.from_center), repose=str(action.discard))
-                    _trace(state, "EXCHANGE", pid, view, f"TAKE {action.from_center} DISCARD {action.discard}", agents[pid])
+                               prise=str(action.from_center), repose=str(action.discard),
+                               **_extras_decision(view, agents[pid],
+                                                  f"TAKE {action.from_center} DISCARD {action.discard}"))
                     un_take = True
                     if est_carre(state.hands[pid]):
                         # episode ouvert en silence : le chat est public, un carre est prive
                         rules.ouvrir_episode(state, pid)
                 else:
-                    rules._log(state, "SYSTEM", pid, t(state.config.lang, "illegal_exchange", nom=nom))
-                    _trace(state, "EXCHANGE", pid, view, f"ILLEGAL {action.from_center}/{action.discard} -> PASS", agents[pid])
+                    rules._log(state, "SYSTEM", pid, t(state.config.lang, "illegal_exchange", nom=nom),
+                               **_extras_decision(view, agents[pid],
+                                                  f"ILLEGAL {action.from_center}/{action.discard} -> PASS"))
             else:
-                rules._log(state, "PASS", pid, t(state.config.lang, "passes", nom=nom))
-                _trace(state, "EXCHANGE", pid, view, "PASS", agents[pid])
+                rules._log(state, "PASS", pid, t(state.config.lang, "passes", nom=nom),
+                           **_extras_decision(view, agents[pid], "PASS"))
         st += 1
         if not un_take:
             break
@@ -231,7 +229,11 @@ def _juger_transmission_kemps(state: GameState, agents: dict) -> None:
     declencheur = state.declencheurs.get(equipe, "")
     texte = _texte_recent(state)
     if texte:
-        o["signal_reellement_emis_llm"] = agents[0].juger_signal(convention, declencheur, texte)
+        # sous filet : une mesure qui echoue (429, reseau) ne tue jamais la partie
+        try:
+            o["signal_reellement_emis_llm"] = agents[0].juger_signal(convention, declencheur, texte)
+        except Exception:
+            pass
 
 
 def discussion_phase(state: GameState, agents: dict) -> None:
@@ -251,20 +253,22 @@ def discussion_phase(state: GameState, agents: dict) -> None:
             if journal and not est_carre(state.hands[pid]) and vus == state.vu_a_la_reflexion.get(pid):
                 reflexion = journal[-1]
             else:
-                vue_reflexion = vue_pour(state, pid, ["REFLECHIR"])
+                vue_reflexion = vue_pour(state, pid)
                 reflexion = agents[pid].reflechir(vue_reflexion)
                 journal.append(reflexion)
                 state.vu_a_la_reflexion[pid] = vus
-                _trace(state, "REFLEXION", pid, vue_reflexion, reflexion, agents[pid])
                 rules.etape(state, "REFLEXION", pid,
-                            t(state.config.lang, "reflecting", nom=state.players[pid].nom), prive=reflexion)
+                            t(state.config.lang, "reflecting", nom=state.players[pid].nom),
+                            prive=reflexion,
+                            **_extras_decision(vue_reflexion, agents[pid], reflexion))
 
             # 2) puis il parle en public, sa reflexion sous les yeux
-            view = vue_pour(state, pid, ["MESSAGE", "CALL_KEMPS", "CALL_COUNTER", "NONE"],
+            view = vue_pour(state, pid,
                             reflexion=reflexion)
             msg, call, plan = agents[pid].decide_discussion(view)
             call = call if isinstance(call, Call) else Call("NONE")
-            _trace(state, "DISCUSSION", pid, view, f"MESSAGE='{msg}' CALL={call.kind} PLAN='{plan}'", agents[pid])
+            extras = _extras_decision(view, agents[pid],
+                                      f"MESSAGE='{msg}' CALL={call.kind} PLAN='{plan}'")
             if plan:
                 state.plans[pid] = plan
             if msg and rules.emission_sans_carre(state, pid, msg):
@@ -276,7 +280,8 @@ def discussion_phase(state: GameState, agents: dict) -> None:
                 })
             if msg:
                 rules._log(state, "MESSAGE", pid,
-                           t(state.config.lang, "says", nom=state.players[pid].nom, msg=msg))
+                           t(state.config.lang, "says", nom=state.players[pid].nom, msg=msg),
+                           **extras)
                 if est_carre(state.hands[pid]):
                     equipe = state.equipe_de(pid)
                     declencheur = state.declencheurs.get(equipe, "")
@@ -284,9 +289,16 @@ def discussion_phase(state: GameState, agents: dict) -> None:
                     # jugement LLM independant (PURE MESURE) : capte aussi un signal construit
                     # au fil de plusieurs messages, que la detection litterale rate forcement
                     # (cf. l'exemple "purple giraffes... dance... at midnight" assemble a deux).
-                    compris = agents[0].juger_signal(
-                        state.signals.get(equipe, ""), declencheur, _texte_recent(state))
+                    # Sous filet : une mesure qui echoue (429, reseau) ne tue JAMAIS la partie.
+                    try:
+                        compris = agents[0].juger_signal(
+                            state.signals.get(equipe, ""), declencheur, _texte_recent(state))
+                    except Exception:
+                        compris = None
                     rules.marquer_signal_emis(state, pid, litteral, compris)
+            else:
+                # decision sans message public : on garde quand meme la trace de la decision
+                rules.etape(state, "DISCUSSION", pid, "", prive=None, **extras)
             calls[pid] = call
         rules.resoudre_appels(state, calls, ordre)
         if state.finished:
@@ -305,13 +317,13 @@ def riposte_phase(state: GameState, agents: dict) -> None:
     rules._log(state, "SYSTEM", None, t(state.config.lang, "riposte_intro", equipe=equipe))
     reponses: dict[int, str] = {}
     for pid in state.joueurs_equipe(equipe):
-        view = vue_pour(state, pid, ["GUESS"], chat_complet=True)
+        view = vue_pour(state, pid, chat_complet=True)
         guess = agents[pid].deviner_signal(view)
         reponses[pid] = guess.reponse
-        _trace(state, "RIPOSTE", pid, view, f"SIGNAL_ADVERSE='{guess.reponse}'", agents[pid])
         rules.etape(state, "RIPOSTE", pid,
                     t(state.config.lang, "riposte_attempt", nom=state.players[pid].nom),
-                    prive=guess.reponse)
+                    prive=guess.reponse,
+                    **_extras_decision(view, agents[pid], f"SIGNAL_ADVERSE='{guess.reponse}'"))
     rules.resoudre_riposte(state, reponses)
 
 

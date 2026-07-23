@@ -47,7 +47,10 @@ def _instantane(state: GameState, tokens: dict | None, en_cours: bool,
              "pid": ev.pid, "texte": ev.texte}
             for ev in state.public_log
         ],
-        "timeline": list(state.timeline),
+        # champs lourds (prompt + reponse brute de chaque decision) : reserves au transcript
+        # debug, inutiles a la page et couteux a reecrire 2x/s
+        "timeline": [{k: v for k, v in e.items() if k not in ("prompt_user", "reponse_brute")}
+                     for e in state.timeline],
         "centre": [str(c) for c in state.center],
         "episodes": list(state.episodes),
         "appels_sans_signal": list(state.appels_sans_signal),

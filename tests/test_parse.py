@@ -9,7 +9,7 @@ from kems.orchestrator import setup
 def test_parse_carte_valide():
     cfg = Config(master_seed=1)
     state = setup(cfg, ["mistral"] * 4)
-    view = vue_pour(state, 0, ["TAKE", "PASS"])
+    view = vue_pour(state, 0)
     fc = view.centre[0]
     dc = view.ma_main[0]
     action = parse.parse_carte(f"ACTION: TAKE {fc} DISCARD {dc}", view)
@@ -20,7 +20,7 @@ def test_parse_carte_valide():
 def test_parse_carte_illisible_repli_pass():
     cfg = Config(master_seed=1)
     state = setup(cfg, ["mistral"] * 4)
-    view = vue_pour(state, 0, ["TAKE", "PASS"])
+    view = vue_pour(state, 0)
     action = parse.parse_carte("blabla incomprehensible", view)
     assert not isinstance(action, Take)  # repli = Pass
 
@@ -28,7 +28,7 @@ def test_parse_carte_illisible_repli_pass():
 def test_parse_discussion_kemps():
     cfg = Config(master_seed=1)
     state = setup(cfg, ["mistral"] * 4)
-    view = vue_pour(state, 0, ["MESSAGE"])
+    view = vue_pour(state, 0)
     msg, call, plan = parse.parse_discussion("MESSAGE: hop\nCALL: KEMPS\nPLAN: x", view)
     assert call.kind == "KEMPS"
     assert msg == "hop"
@@ -42,7 +42,7 @@ def test_prompt_ne_fuit_pas_info_adverse():
     rules.poser_signal(state, 0, "banane")
     rules.poser_signal(state, 1, "MONTAGNE_SECRETE")
     state.plans[1] = "PLAN_SECRET_1"
-    view = vue_pour(state, 0, ["MESSAGE"])
+    view = vue_pour(state, 0)
     _sys, user = prompts.prompt_discussion(view)
     assert "MONTAGNE_SECRETE" not in user
     assert "PLAN_SECRET_1" not in user

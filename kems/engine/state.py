@@ -57,11 +57,10 @@ class GameState:
     vainqueur_match: int | None = None
     historique_manches: list[dict] = field(default_factory=list)   # outcome de chaque manche
 
-    # trace detaillee pour l'observateur humain (mains, prompts, reponses brutes...)
-    trace: list[dict] = field(default_factory=list)
-
     # suite ORDONNEE de toutes les etapes (publiques ET privees), avec l'etat du centre et des
-    # mains a chaque instant : c'est ce que le tableau de bord rejoue pas a pas.
+    # mains a chaque instant. FLUX D'OBSERVABILITE UNIQUE : le tableau de bord la rejoue pas a
+    # pas (sans les champs lourds), le transcript debug filtre les etapes portant une decision
+    # (`action` present, avec prompt et reponse brute du LLM).
     timeline: list[dict] = field(default_factory=list)
 
     # --- mesures du livrable ---

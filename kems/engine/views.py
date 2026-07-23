@@ -13,9 +13,7 @@ class PlayerView:
     pid: int
     nom: str
     equipe: int
-    partenaire_pid: int | None
     nom_partenaire: str
-    roster: list[tuple[int, str, int]]   # public : (pid, nom, equipe) de tous
 
     ma_main: list[Card]
     jai_un_carre: bool                   # dit par l'arbitre (anti-hallucination)
@@ -28,15 +26,13 @@ class PlayerView:
     centre: list[Card]                   # public
     chat_global: list[Event]             # fenetre bornee du chat public
 
-    legal_actions: list[str]
-
     nego_proposition: str = ""           # negociation : le signal candidat en cours de discussion
     nego_declencheur: str = ""           # negociation : le declencheur sur la table (a re-ecrire pour sceller)
     ma_reflexion: str = ""               # la reflexion privee que le joueur vient tout juste d'ecrire
     adversaires: list[str] = field(default_factory=list)   # public : noms de l'equipe adverse
 
 
-def vue_pour(state: GameState, pid: int, legal_actions: list[str],
+def vue_pour(state: GameState, pid: int,
              nego_proposition: str = "", chat_complet: bool = False,
              reflexion: str = "", nego_declencheur: str = "") -> PlayerView:
     e = state.equipe_de(pid)
@@ -45,9 +41,7 @@ def vue_pour(state: GameState, pid: int, legal_actions: list[str],
         pid=pid,
         nom=state.players[pid].nom,
         equipe=e,
-        partenaire_pid=state.partenaire(pid),
         nom_partenaire=state.players[state.partenaire(pid)].nom if state.partenaire(pid) is not None else "?",
-        roster=[(p.pid, p.nom, p.equipe) for p in state.players],
         ma_main=list(state.hands[pid]),
         jai_un_carre=est_carre(state.hands[pid]),
         mon_signal=state.signals.get(e, ""),
@@ -57,7 +51,6 @@ def vue_pour(state: GameState, pid: int, legal_actions: list[str],
         mon_journal=list(state.journaux.get(pid, [])),
         centre=list(state.center),
         chat_global=list(state.public_log[-fen:]),
-        legal_actions=list(legal_actions),
         nego_proposition=nego_proposition,
         nego_declencheur=nego_declencheur,
         ma_reflexion=reflexion,
