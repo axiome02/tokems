@@ -148,10 +148,21 @@ Commande : `python -m kems.run --seed 1010 --nb-rangs 10 --points 1 --max-manche
       convenue (« Our secret phrase was "This game hates me..." ») et l'emet ; Player 1 chasse
       des signaux fantomes (theme animalier) pendant 4 monologues puis crie un KEMPS aveugle
       -> FAIL tour 2. Compte dans `appels_sans_signal` (1, perdant).
-    - Les deux violent la lecon #5 (convention DECIDABLE) par des faces opposees. Question de
-      design ouverte, non tranchee : le moteur epingle la proposition telle quelle meme quand
-      c'est une politique sans declencheur — exiger la convergence serait un garde-fou de plus
-      (a peser contre « ne pas savoir conclure est une mesure »).
+    - Les deux violent la lecon #5 (convention DECIDABLE) par des faces opposees.
+    **Tranche le 23/07/2026 — scellage NOTARIE de la negociation** (orchestrator.negotiation,
+    tests dedies) : un accord (explicite ou tacite) ne clot la negociation que si (a) le
+    declencheur sur la table passe `declencheur_exploitable` ET (b) l'accordeur RE-ECRIT
+    lui-meme ce declencheur (read-back : comprehension partagee prouvee, pas supposee). Le
+    declencheur sur la table est affiche dans le prompt de negociation, et la regle du
+    read-back y est enoncee. Sans scellage au plafond : on fige comme avant, et
+    `state.nego_convergence[equipe] = False` le mesure (ne pas savoir conclure = une donnee).
+    Ce n'est PAS un retour des garde-fous retires : ceux-la bloquaient des coups de jeu ; ici
+    le moteur-notaire refuse d'authentifier un contrat sans sa clause essentielle, en phase de
+    setup ou il est deja l'arbitre (extraction + epinglage, design v0).
+    **Et anti-confabulation** : l'en-tete de verite (reflexion + discussion, 2 langues) epingle
+    desormais aussi le DECLENCHEUR EXACT (`view.mon_declencheur`) a cote de la convention —
+    Player 3 n'avait confabule que parce que le moteur connaissait « le texte litteral » sans
+    jamais le reinjecter. Non remesure.
     - Au credit de large : la manche vit 2 tours pleins, 16 messages publics — le meilleur
       bavardage de couverture jamais produit (vannes suivies singe/raton laveur), et la regle
       de PREMIERE OCCURRENCE inventee par l'equipe 1 (declencheur valide seulement la premiere

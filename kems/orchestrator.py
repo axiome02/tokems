@@ -116,6 +116,14 @@ def negotiation(state: GameState, agents: dict, equipes: tuple[int, ...] | None 
     propose/affine, ou verrouille (ACCORD: OUI) la proposition faite par son coequipier.
     On s'arrete des qu'un accord porte sur la proposition de l'AUTRE joueur (garantit au
     moins un aller-retour), sinon au bout de max_tours_negociation (fige la derniere proposition).
+
+    Scellage NOTARIE (anti-confabulation, cf. game_42_large_v2) : un accord — explicite ou
+    tacite — ne clot la negociation que si (a) le declencheur sur la table est EXPLOITABLE
+    (concret, pas une meta-politique) et (b) l'accordeur RE-ECRIT lui-meme ce declencheur
+    (read-back : les deux joueurs ont alors ecrit independamment la meme chaine litterale —
+    la comprehension partagee est prouvee, pas supposee). Le moteur ne dicte rien du contenu :
+    il refuse d'authentifier un contrat sans sa clause essentielle. Sans scellage au plafond,
+    on fige comme avant et `state.nego_convergence[equipe] = False` le MESURE.
     """
     state.phase = "NEGOTIATION"
     for equipe in equipes if equipes is not None else (0, 1):
@@ -123,9 +131,11 @@ def negotiation(state: GameState, agents: dict, equipes: tuple[int, ...] | None 
         proposition = ""
         declencheur = ""
         proposeur: int | None = None  # qui a fait la proposition actuellement sur la table
+        scelle = False
         for nt in range(state.config.max_tours_negociation):
             pid = joueurs[nt % len(joueurs)]
-            view = vue_pour(state, pid, ["NEGOTIATE"], nego_proposition=proposition)
+            view = vue_pour(state, pid, ["NEGOTIATE"], nego_proposition=proposition,
+                            nego_declencheur=declencheur)
             n = agents[pid].negotiate(view)
             nom = state.players[pid].nom
             if n.message:
@@ -143,11 +153,18 @@ def negotiation(state: GameState, agents: dict, equipes: tuple[int, ...] | None 
             # jusqu'a epuiser max_tours_negociation (~12 appels de remplissage par partie).
             echo = bool(n.proposition and proposition
                         and normaliser(n.proposition) == normaliser(proposition))
-            if (n.accord or echo) and proposition and proposeur is not None and proposeur != pid:
+            # read-back : l'accordeur re-ecrit le declencheur de la table, a l'identique
+            readback = bool(declencheur and n.declencheur
+                            and normaliser(n.declencheur) == normaliser(declencheur))
+            if ((n.accord or echo) and proposition and proposeur is not None
+                    and proposeur != pid and readback
+                    and rules.declencheur_exploitable(declencheur)):
+                scelle = True
                 break
             if n.proposition:
                 proposition, proposeur = n.proposition, pid
                 declencheur = n.declencheur or ""
+        state.nego_convergence[equipe] = scelle
         rules.poser_signal(state, equipe, proposition or AUCUN_SIGNAL, declencheur)
 
 

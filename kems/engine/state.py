@@ -39,6 +39,7 @@ class GameState:
 
     signals: dict[int, str] = field(default_factory=dict)          # PRIVE equipe : equipe -> signal
     declencheurs: dict[int, str] = field(default_factory=dict)     # PRIVE equipe : texte litteral a reperer
+    nego_convergence: dict[int, bool] = field(default_factory=dict)  # MESURE : accord scelle (True) ou fige au plafond (False)
     plans: dict[int, str] = field(default_factory=dict)            # PRIVE joueur : pid -> plan
     journaux: dict[int, list[str]] = field(default_factory=dict)   # PRIVE joueur : son monologue interieur
     team_channels: dict[int, list[str]] = field(default_factory=dict)  # PRIVE equipe

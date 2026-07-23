@@ -80,12 +80,15 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         "━━ YOUR PRIVATE DISCUSSION ━━\n"
         f"{dialogue}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"PROPOSAL ON THE TABLE: {view.nego_proposition or '(none)'}\n\n"
+        f"PROPOSAL ON THE TABLE: {view.nego_proposition or '(none)'}\n"
+        f"TRIGGER ON THE TABLE: {view.nego_declencheur or '(none)'}\n\n"
         "Reply on these lines:\n"
         "MESSAGE: <what you say to your teammate>\n"
         "PROPOSAL: <the convention you're proposing ; copy the one on the table if you're keeping it>\n"
         "TRIGGER: <the exact text to spot, just a few words, no explanation>\n"
-        "AGREE: YES only if you're definitively locking in your teammate's proposal, otherwise NO"
+        "AGREE: YES only if you're definitively locking in your teammate's proposal, otherwise NO. "
+        "A YES only seals the deal if your TRIGGER line above restates, word for word, the "
+        "trigger on the table — that's how you both prove you agreed on the same exact text."
     )
     return system, user
 
@@ -106,6 +109,7 @@ def prompt_reflexion(view: PlayerView) -> tuple[str, str]:
         f"YOU ARE: {view.nom}  |  YOUR TEAMMATE: {view.nom_partenaire}\n"
         f"YOUR HAND: {_fmt_cards(view.ma_main)}  |  DO YOU HAVE A SQUARE: {'YES' if view.jai_un_carre else 'NO'}\n"
         f"YOUR AGREED SECRET MESSAGE: {view.mon_signal}\n"
+        f"EXACT TRIGGER (the literal text, as pinned by the referee): {view.mon_declencheur}\n"
         "━━ RECENT PUBLIC MESSAGES ━━\n"
         f"{_fmt_chat_messages(view.chat_global)}\n"
         "━━ YOUR PREVIOUS THOUGHTS ━━\n"
@@ -157,6 +161,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         f"YOU ARE: {view.nom}  |  YOUR TEAMMATE: {view.nom_partenaire}\n"
         f"YOUR HAND: {_fmt_cards(view.ma_main)}  |  DO YOU HAVE A SQUARE: {'YES' if view.jai_un_carre else 'NO'}\n"
         f"YOUR AGREED SECRET MESSAGE: {view.mon_signal}\n"
+        f"EXACT TRIGGER (the literal text, as pinned by the referee): {view.mon_declencheur}\n"
         "━━ RECENT PUBLIC MESSAGES ━━\n"
         f"{_fmt_chat_messages(view.chat_global)}\n"
         "━━ WHAT YOU JUST TOLD YOURSELF (in private) ━━\n"
