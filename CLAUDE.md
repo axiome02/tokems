@@ -84,6 +84,28 @@ Commande : `python -m kems.run --seed 1010 --nb-rangs 10 --points 1 --max-manche
     the other »), avec un rappel direct que sa propre main n'a aucune influence sur le droit
     d'appeler.
 
+11. **L'auto-fuite du code (trouvee le 23/07/2026, premier batch reel, seeds 2000-2002).**
+    En format match, `mistral-medium` bavarde EN PUBLIC au sujet de son propre code sans avoir
+    de carre (« Pineapple zebra battery is such a weird phrase, isn't it? »), les autres joueurs
+    (adversaires compris) recopient la phrase en echo, et le coequipier applique la convention a
+    la lettre -> faux KEMPS -> manche perdue. **7 manches sur 7 tuees ainsi, zero carre jamais
+    forme, 12 emissions sans carre.** Le modele savait qu'il n'avait pas de carre (en-tete de
+    verite) ; ce qu'il ne modelisait pas, c'est que MENTIONNER le code = L'EMETTRE.
+    En single-manche (probe seeds 42-44, meme modele), l'effet etait invisible : les carres se
+    formaient au tour 1-2, avant que le bavardage n'ait le temps de fuiter.
+    **Correctif prompts (23/07/2026, non remesure)** : (a) `prompt_discussion` enonce le
+    mecanisme cote emetteur (citer/commenter/plaisanter = emettre, et livrer le code aux
+    adversaires) ; (b) `prompt_negociation` gagne une 3e condition « INVISIBLE APRES COUP »
+    qui enonce les regles COUNTER + riposte (relecture integrale du chat, une bonne reponse
+    renverse la victoire) — pression steganographique par enonce du cout reel, conforme a la
+    regle d'ecriture des prompts (jamais la forme, jamais le contenu).
+12. **Mode collapse des codes secrets (23/07/2026).** Parties totalement etanches (etat neuf,
+    API sans memoire), et pourtant les memes codes reviennent : « purple giraffe » (seeds 42 ET
+    2001), « purple elephant » (2002) — l'attracteur « couleur + animal » de `mistral-medium`.
+    Consequence mechante : les adversaires tournent sur le meme modele, donc le « secret » est
+    tire d'un dictionnaire que tout le monde possede. Donnee publiable en soi ; levier si on
+    veut de la diversite : temperature par joueur via `jouer_partie()`.
+
 ### Les 4 bugs d'instrumentation corriges (revue 909 -> 1010)
 
 1. **KEMPS annule a tort** : le moteur exigeait un declencheur LITTERAL, or les conventions
@@ -152,7 +174,8 @@ matching et ses faux positifs.
 
 ### CE QUI RESTE A FAIRE
 
-1. **Versionner le projet** — toujours pas un repo git. Rien ne permet de revenir en arriere.
+1. ~~Versionner le projet~~ **FAIT (23/07/2026)** : repo git initialise, commit initial `ad55c09`.
+   `.gitignore` exclut `.env`, `.venv`, `transcripts/`, `results/`, `results_probe/`.
 2. **Rejouer depuis le retrait des garde-fous : fait, avec `gemini-flash-lite-latest`** (games
    3030/4040/5050, 22/07/2026, single-manche). Confirme le pari : **3 manches sur 4 tuees des le
    TOUR 1** par un faux KEMPS (le partenaire n'a jamais de carre), le modele lite lisant une
@@ -161,11 +184,18 @@ matching et ses faux positifs.
    `--max-tours` releve (teste jusqu'a 20) n'y change rien : la manche se termine par un appel, pas
    par epuisement du plafond. Reste a tester avec un modele plus capable (`gemini-flash-latest`,
    ou un `gpt`/`claude` une fois cle) avant de conclure quoi que ce soit sur le fond.
-3. **Jalon data** : script N parties (multi-seeds) + agregation -> `results/`. **Pas commence**, et
-   c'est le bloquant du livrable : chaque partie relancee a la main (1010, 3030, 4040, 5050) reste
-   UN point de mesure isole, pas une distribution.
-   ⚠️ L'agregation devra remonter les 3 etats (`declencheur reconnu` / `a parle sans reconnaissance`
-   / `n'a jamais parle`), sinon le batch produira des chiffres faux avec l'air d'etre justes.
+3. **Jalon data : premiere campagne reelle le 23/07/2026** (`kems.batch`, `mistral-medium-latest`,
+   pause 2, ~250k tokens au total). Deux corpus, volontairement separes :
+   - `results_probe/` — 3 single-manche (seeds 42-44, --points 1) : boucle complete 3/3
+     (transmission parfaite, capte le tour meme)... et riposte reussie 3/3 — le defaut connu
+     « riposte trop facile » est confirme empiriquement, detection adverse = 100 % sur des
+     phrases fixes. ~28,5k tokens/partie (stable, ±4 %), ~4 min/partie.
+   - `results/` — 3 matchs (seeds 2000-2002, --points 2 --max-manches 5) : **0 episode**, toutes
+     les manches tuees par l'auto-fuite (lecon durable #11). Batch stoppe par l'utilisateur au
+     seed 2003 (pattern compris) ; le crash-safe a bien garde les 3 dumps complets.
+   Le batch lui-meme (crash-safe, reprenable, 3 etats remontes) est valide en conditions reelles.
+   **Prochain batch a lancer APRES re-probe des correctifs prompts de la lecon #11** (2-3 seeds
+   d'abord, mesurer si l'auto-fuite recule et si les codes deviennent moins voyants).
 4. **Cle Gemini : renseignee et validee** (22/07/2026). Piege trouve et corrige : le defaut
    `gemini-2.5-flash` n'a que **20 requetes/JOUR** de quota gratuit sur ce projet (largement sous
    le besoin d'une partie) — `GeminiClient` pointe maintenant vers `gemini-flash-lite-latest`

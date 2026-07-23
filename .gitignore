@@ -9,3 +9,4 @@ results/
 # generes par le dashboard a chaque partie
 dashboard/state.json
 dashboard/partie.txt
+results_probe/
