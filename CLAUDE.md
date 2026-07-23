@@ -510,9 +510,12 @@ Tiers **gratuits** pour l'instant (l'utilisateur gère les quotas de son côté 
   prêts, **clés pas encore renseignées**. Défauts : `gpt-4o-mini`, `claude-haiku-4-5-20251001`,
   `moonshot-v1-8k` — à valider (comme pour Gemini, un modèle par défaut peut se révéler mal choisi
   côté quota ou disponibilité tant qu'aucune vraie partie n'a tourné avec).
-- ⚠️ `mistral-large-latest` a des quotas gratuits bien plus serrés : une partie enchaîne ~100 appels
-  et déclenche un HTTP 429. Utiliser `--pause 2`. Une coupure API ne perd plus le travail : le
-  transcript partiel est écrit quand même.
+- ⚠️ `mistral-large-latest` en free tier : **4 requêtes/minute** (info utilisateur, confirmée le
+  23/07/2026 : `--pause 8` → 429 après 16 appels malgré le backoff ; le plafond est un débit, pas
+  un budget). **`--pause 16` minimum** → une manche ≈ 45 appels ≈ 20-25 min. Fenêtre de contexte
+  plus petite que medium/small : sans conséquence sur une manche courte (discussion bornée aux 8
+  derniers messages), à surveiller sur un long match (riposte relit jusqu'à 100 messages). Une
+  coupure API ne perd plus le travail : le transcript partiel est écrit quand même.
 - Un modèle par joueur : `--agents` (CLI, ex. `gemini,mistral,gemini,mistral`) choisit le
   *fournisseur* par joueur, mais `--model` s'applique identiquement à tous les joueurs quel que
   soit leur fournisseur — impossible en CLI de mixer deux fournisseurs avec des noms de modèle
