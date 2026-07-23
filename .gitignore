@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+transcripts/
+results/
+.pytest_cache/
+.claude/
+# generes par le dashboard a chaque partie
+dashboard/state.json
+dashboard/partie.txt

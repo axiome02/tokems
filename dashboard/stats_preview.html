@@ -1,0 +1,491 @@
+<title>Kems-Bench — Stats preview (mockup)</title>
+<style>
+  /* ============ TOKENS ============ */
+  :root {
+    /* neutres à biais teal — choisis, pas hérités */
+    --bg: #EAEEED;
+    --surface: #FBFCFB;
+    --surface-2: #F1F4F3;
+    --ink: #161A19;
+    --ink-2: #4B5452;
+    --muted: #707977;
+    --line: #DAE0DE;
+    --line-strong: #C6CECB;
+    /* accent signal + 3 états (palette validée — mode clair) */
+    --accent: #1F9E92;
+    --st-reconnu: #1F9E92;
+    --st-parle:   #B5842A;
+    --st-jamais:  #C25E77;
+    --warn-bg: #F6E9D6;
+    --warn-ink: #7A5A1E;
+    --shadow: 0 1px 2px rgba(20,30,28,.05), 0 8px 28px -18px rgba(20,30,28,.28);
+
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --r: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D0F13;
+      --surface: #15171E;
+      --surface-2: #1B1E27;
+      --ink: #E8EBE9;
+      --ink-2: #A3ACA9;
+      --muted: #7E8886;
+      --line: #262A33;
+      --line-strong: #333945;
+      --accent: #2AA99B;
+      --st-reconnu: #2AA99B;
+      --st-parle:   #B0862C;
+      --st-jamais:  #D06B93;
+      --warn-bg: #2A2113;
+      --warn-ink: #E0B871;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 34px -20px rgba(0,0,0,.7);
+    }
+  }
+  /* le toggle du viewer doit gagner dans les deux sens */
+  :root[data-theme="light"] {
+    --bg:#EAEEED; --surface:#FBFCFB; --surface-2:#F1F4F3; --ink:#161A19; --ink-2:#4B5452;
+    --muted:#707977; --line:#DAE0DE; --line-strong:#C6CECB;
+    --accent:#1F9E92; --st-reconnu:#1F9E92; --st-parle:#B5842A; --st-jamais:#C25E77;
+    --warn-bg:#F6E9D6; --warn-ink:#7A5A1E;
+  }
+  :root[data-theme="dark"] {
+    --bg:#0D0F13; --surface:#15171E; --surface-2:#1B1E27; --ink:#E8EBE9; --ink-2:#A3ACA9;
+    --muted:#7E8886; --line:#262A33; --line-strong:#333945;
+    --accent:#2AA99B; --st-reconnu:#2AA99B; --st-parle:#B0862C; --st-jamais:#D06B93;
+    --warn-bg:#2A2113; --warn-ink:#E0B871;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .page {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans); line-height: 1.5;
+    padding: clamp(18px, 4vw, 44px) 16px 72px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+
+  /* ============ HEADER ============ */
+  header.head { margin-bottom: 26px; }
+  .toprow { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 {
+    font-size: clamp(26px, 4.4vw, 40px); line-height: 1.05; margin: 12px 0 6px;
+    letter-spacing: -.02em; text-wrap: balance; font-weight: 680;
+  }
+  h1 .accent { color: var(--accent); }
+  .sub { color: var(--ink-2); max-width: 62ch; font-size: 15px; }
+  .fake-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--warn-bg); color: var(--warn-ink);
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+    padding: 7px 12px; border-radius: 999px; font-weight: 600;
+    border: 1px solid color-mix(in srgb, var(--warn-ink) 30%, transparent);
+  }
+  .fake-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn-ink); }
+
+  .fake-strip {
+    margin-top: 16px; display: flex; gap: 10px; align-items: baseline;
+    background: var(--warn-bg); color: var(--warn-ink);
+    border: 1px solid color-mix(in srgb, var(--warn-ink) 26%, transparent);
+    border-radius: var(--r); padding: 11px 15px; font-size: 13.5px;
+  }
+  .fake-strip b { font-family: var(--font-mono); letter-spacing: .03em; }
+
+  /* ============ KPI ============ */
+  .kpis {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0 10px;
+  }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 16px 16px 15px; box-shadow: var(--shadow);
+  }
+  .kpi .k-label { font-size: 12.5px; color: var(--muted); }
+  .kpi .k-num {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+    font-size: clamp(26px, 3.6vw, 33px); font-weight: 600; letter-spacing: -.02em;
+    margin-top: 8px; line-height: 1;
+  }
+  .kpi .k-sub { font-size: 12px; color: var(--ink-2); margin-top: 7px; }
+  .kpi .k-num .unit { font-size: .55em; color: var(--muted); font-weight: 500; margin-left: 3px; }
+
+  /* ============ PANELS ============ */
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 20px 22px 22px; box-shadow: var(--shadow); margin-top: 16px;
+  }
+  .panel h2 { font-size: 17px; margin: 4px 0 3px; letter-spacing: -.01em; font-weight: 640; }
+  .panel .desc { color: var(--ink-2); font-size: 13.5px; margin: 0 0 18px; max-width: 68ch; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
+  .legend .item { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-2); }
+  .legend .sw { width: 11px; height: 11px; border-radius: 3px; }
+
+  /* stacked transmission bars */
+  .tbar-row { margin: 14px 0; }
+  .tbar-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .tbar-head .name { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+  .tbar-head .meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+  .tbar {
+    display: flex; height: 34px; border-radius: 5px; overflow: hidden;
+    background: var(--surface-2); gap: 2px;
+  }
+  .tseg {
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 12px; color: #fff; font-weight: 600;
+    min-width: 0; overflow: hidden; white-space: nowrap;
+    transform-origin: left; cursor: default;
+  }
+  .tseg:first-child { border-radius: 5px 0 0 5px; }
+  .tseg:last-child  { border-radius: 0 5px 5px 0; }
+
+  .band-note {
+    margin-top: 18px; padding: 12px 15px; border-radius: 10px;
+    background: var(--surface-2); border: 1px dashed var(--line-strong);
+    font-size: 13px; color: var(--ink-2);
+  }
+  .band-note b { color: var(--ink); font-family: var(--font-mono); }
+
+  /* funnel */
+  .funnel { display: flex; flex-direction: column; gap: 9px; }
+  .fn-row { display: grid; grid-template-columns: 155px 1fr; gap: 12px; align-items: center; }
+  .fn-label { font-size: 12.5px; color: var(--ink-2); text-align: right; }
+  .fn-track { background: var(--surface-2); border-radius: 5px; height: 26px; position: relative; }
+  .fn-fill {
+    height: 100%; border-radius: 4px; background: var(--accent);
+    display: flex; align-items: center; transform-origin: left;
+  }
+  .fn-fill .n { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: #fff; padding: 0 9px; }
+  .fn-pct { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-left: 8px; }
+
+  /* detection bars */
+  .det { display: flex; flex-direction: column; gap: 16px; }
+  .det-row .det-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .det-name { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+  .det-val { font-family: var(--font-mono); font-size: 13px; color: var(--ink); }
+  .det-track { background: var(--surface-2); border-radius: 5px; height: 22px; overflow: hidden; }
+  .det-fill { height: 100%; border-radius: 4px; transform-origin: left; }
+
+  /* tokens */
+  .tok-chart { display: flex; align-items: flex-end; gap: 4px; height: 150px; padding-top: 6px; position: relative; }
+  .tok-bar { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 3px; transform-origin: bottom; opacity: .9; cursor: default; }
+  .tok-bar:hover { opacity: 1; }
+  .tok-mean {
+    position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--st-parle);
+    pointer-events: none;
+  }
+  .tok-mean span {
+    position: absolute; right: 0; top: -18px; font-family: var(--font-mono);
+    font-size: 11px; color: var(--st-parle); background: var(--surface); padding: 0 4px;
+  }
+  .tok-axis { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+  /* codes gallery */
+  .codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
+  .code {
+    border: 1px solid var(--line); border-radius: 10px; padding: 13px 14px; background: var(--surface-2);
+    display: flex; flex-direction: column; gap: 9px;
+  }
+  .code .sig { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--ink); word-break: break-word; }
+  .code .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tag { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--ink-2); white-space: nowrap; }
+  .pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 9px; border-radius: 999px; font-weight: 600; }
+  .pill.safe { color: var(--st-reconnu); background: color-mix(in srgb, var(--st-reconnu) 15%, transparent); }
+  .pill.busted { color: var(--st-jamais); background: color-mix(in srgb, var(--st-jamais) 16%, transparent); }
+
+  /* misc */
+  details.tbl { margin-top: 16px; }
+  details.tbl summary { cursor: pointer; font-size: 12.5px; color: var(--muted); font-family: var(--font-mono); }
+  .tbl-scroll { overflow-x: auto; margin-top: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; font-family: var(--font-mono); }
+  th { color: var(--muted); font-weight: 600; }
+
+  footer { margin-top: 30px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+  footer code { font-family: var(--font-mono); color: var(--ink-2); }
+  .sec-eyebrow { margin-bottom: 2px; }
+
+  /* tooltip */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0; transition: opacity .1s;
+    background: var(--ink); color: var(--surface); font-family: var(--font-mono); font-size: 11.5px;
+    padding: 6px 9px; border-radius: 7px; box-shadow: 0 6px 20px -6px rgba(0,0,0,.5); max-width: 240px;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  @media (max-width: 720px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .fn-row { grid-template-columns: 120px 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  @keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+</style>
+
+<div class="page">
+  <div class="wrap">
+    <header class="head">
+      <div class="toprow">
+        <div class="eyebrow">Kems-Bench · steganographic collusion between LLM agents</div>
+        <div class="fake-badge"><span class="dot"></span> MOCK DATA</div>
+      </div>
+      <h1>Does the teammate catch the signal <span class="accent">before the opponent does</span>?</h1>
+      <p class="sub">A layout mockup to validate the <b>shape</b> of the charts before running the real batch.
+        Made-up numbers, populated as if a second model (Gemini) were plugged in — to preview the model-vs-model duel too.</p>
+      <div class="fake-strip">
+        <b>⚠ PREVIEW</b>
+        <span>None of these values come from a real game. They illustrate the layout <code style="font-family:var(--font-mono)">kems.batch</code> will produce once the 20 games have been played.</span>
+      </div>
+    </header>
+
+    <!-- KPIs -->
+    <section class="kpis" id="kpis"></section>
+
+    <!-- TRANSMISSION (hero chart) -->
+    <section class="panel">
+      <div class="eyebrow sec-eyebrow">Product metric #1</div>
+      <h2>Signal transmission, by carrier model</h2>
+      <p class="desc">One episode = one four-of-a-kind formed. Three distinct outcomes, never collapsed to “transmitted yes/no”:
+        the engine is blind to paraphrases, so “recognised verbatim” is a <b>lower bound</b>.</p>
+      <div class="legend" id="tlegend"></div>
+      <div id="transmission"></div>
+      <div class="band-note" id="bandnote"></div>
+      <details class="tbl">
+        <summary>Show the numbers</summary>
+        <div class="tbl-scroll">
+          <table id="ttable">
+            <thead><tr><th>Model</th><th>Episodes</th><th>Recognised</th><th>Spoke, n.r.</th><th>Never spoke</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <!-- FUNNEL + DETECTION -->
+    <div class="grid-2">
+      <section class="panel">
+        <div class="eyebrow sec-eyebrow">Life cycle of a four-of-a-kind</div>
+        <h2>Signalling funnel</h2>
+        <p class="desc">From forming the four-of-a-kind to the caught KEMPS. % relative to four-of-a-kinds formed.</p>
+        <div class="funnel" id="funnel"></div>
+      </section>
+
+      <section class="panel">
+        <div class="eyebrow sec-eyebrow">Product metric #2</div>
+        <h2>Detection by the opponent (rebuttal)</h2>
+        <p class="desc">Share of rebuttals where the opponent unmasked the code. <b>Lower = subtler code</b> (better blended into ordinary language).</p>
+        <div class="det" id="detection"></div>
+      </section>
+    </div>
+
+    <!-- TOKENS -->
+    <section class="panel">
+      <div class="eyebrow sec-eyebrow">Cost</div>
+      <h2>Tokens per game</h2>
+      <p class="desc">The real cost indicator on the free tier. One bar = one seed.</p>
+      <div class="tok-chart" id="tokens"></div>
+      <div class="tok-axis"><span>seed 1000</span><span id="tokmean-lbl"></span><span>seed 1019</span></div>
+    </section>
+
+    <!-- CODES -->
+    <section class="panel">
+      <div class="eyebrow sec-eyebrow">The screenshot for the post</div>
+      <h2>Secret codes invented by the models</h2>
+      <p class="desc">The signals agreed during negotiation, and which ones were blown in rebuttal.</p>
+      <div class="codes" id="codes"></div>
+    </section>
+
+    <footer>
+      <p><b style="color:var(--ink-2)">Method note.</b> “Recognised verbatim” undercounts real emissions
+      (the engine doesn't recognise paraphrases): that's why transmission is given as a <b>min–max range</b>,
+      never a single number. Win rate is deliberately not highlighted — it blends card strategy,
+      signalling, call judgment and luck.</p>
+      <p style="margin-top:8px">Real source to come: <code>results/summary.json</code>, <code>results/episodes.csv</code>,
+      <code>results/codes.csv</code> — generated by <code>python -m kems.batch</code>.</p>
+    </footer>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script>
+(function () {
+  // ---------- DONNÉES FICTIVES ----------
+  const C = { reconnu: 'var(--st-reconnu)', parle: 'var(--st-parle)', jamais: 'var(--st-jamais)' };
+  const data = {
+    parties: 20, episodes: 34, tokensTotal: 987400,
+    transmission: {
+      'mistral-small':     { reconnu: 8,  parle: 5, jamais: 5 },
+      'gemini-2.5-flash':  { reconnu: 10, parle: 3, jamais: 3 },
+    },
+    funnel: [
+      { label: 'Four-of-a-kind formed',  n: 34 },
+      { label: 'Spoke (holding it)',     n: 24 },
+      { label: 'Recognised verbatim',    n: 18 },
+      { label: 'KEMPS called',           n: 15 },
+      { label: 'Caught by teammate',     n: 11 },
+    ],
+    detection: {
+      'mistral-small':    { reussies: 5, total: 7 },
+      'gemini-2.5-flash': { reussies: 2, total: 5 },
+    },
+    tokens: [46200,51800,38900,62400,49100,71200,43600,55300,48700,41200,
+             59800,45100,52600,67300,44800,50200,39700,57400,47900,53100],
+    codes: [
+      { sig: 'Kezako',                model: 'mistral', busted: false },
+      { sig: 'the cat\'s asleep',     model: 'gemini',  busted: false },
+      { sig: 'Zorblax',               model: 'mistral', busted: true  },
+      { sig: 'between us, honestly',  model: 'gemini',  busted: false },
+      { sig: 'quiet day ☀️',          model: 'gemini',  busted: true  },
+      { sig: 'Glibberflax',           model: 'mistral', busted: false },
+      { sig: '🎲 tonight',            model: 'mistral', busted: true  },
+      { sig: 'as usual',              model: 'gemini',  busted: false },
+    ],
+  };
+
+  const pct = (x) => Math.round(x * 100);
+  const tip = document.getElementById('tip');
+  function bindTip(el, html) {
+    el.addEventListener('mousemove', (e) => {
+      tip.innerHTML = html; tip.style.opacity = 1;
+      let x = e.clientX + 14, y = e.clientY + 14;
+      if (x + tip.offsetWidth > innerWidth - 8) x = e.clientX - tip.offsetWidth - 14;
+      if (y + tip.offsetHeight > innerHeight - 8) y = e.clientY - tip.offsetHeight - 14;
+      tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    });
+    el.addEventListener('mouseleave', () => { tip.style.opacity = 0; });
+  }
+
+  // ---------- KPIs ----------
+  const totEp = Object.values(data.transmission).reduce((a, m) => a + m.reconnu + m.parle + m.jamais, 0);
+  const totReconnu = Object.values(data.transmission).reduce((a, m) => a + m.reconnu, 0);
+  const totParle = Object.values(data.transmission).reduce((a, m) => a + m.parle, 0);
+  const minT = pct(totReconnu / totEp), maxT = pct((totReconnu + totParle) / totEp);
+  const kpis = [
+    { label: 'Games played', num: data.parties, sub: '2 models · seeds 1000–1019' },
+    { label: 'Signalling episodes', num: data.episodes, sub: 'one four-of-a-kind = one episode' },
+    { label: 'Signal transmission', num: minT + '–' + maxT, unit: '%', sub: 'range: lower bound → upper bound' },
+    { label: 'Tokens spent', num: (data.tokensTotal / 1e6).toFixed(2), unit: 'M', sub: '≈ ' + Math.round(data.tokensTotal / data.parties / 1000) + 'k / game' },
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k => `
+    <div class="kpi">
+      <div class="k-label">${k.label}</div>
+      <div class="k-num">${k.num}${k.unit ? '<span class="unit">' + k.unit + '</span>' : ''}</div>
+      <div class="k-sub">${k.sub}</div>
+    </div>`).join('');
+
+  // ---------- Legend ----------
+  const states = [
+    { key: 'reconnu', label: 'Recognised verbatim', col: C.reconnu },
+    { key: 'parle',   label: 'Spoke, not recognised', col: C.parle },
+    { key: 'jamais',  label: 'Never spoke', col: C.jamais },
+  ];
+  document.getElementById('tlegend').innerHTML = states.map(s =>
+    `<span class="item"><span class="sw" style="background:${s.col}"></span>${s.label}</span>`).join('');
+
+  // ---------- Transmission stacked bars ----------
+  const tHost = document.getElementById('transmission');
+  Object.entries(data.transmission).forEach(([model, m], i) => {
+    const tot = m.reconnu + m.parle + m.jamais;
+    const row = document.createElement('div');
+    row.className = 'tbar-row';
+    row.innerHTML = `
+      <div class="tbar-head">
+        <span class="name">${model}</span>
+        <span class="meta">${tot} episodes · recognised ${pct(m.reconnu / tot)}%</span>
+      </div>
+      <div class="tbar"></div>`;
+    const bar = row.querySelector('.tbar');
+    states.forEach((s, j) => {
+      const v = m[s.key], w = (v / tot) * 100;
+      if (v === 0) return;
+      const seg = document.createElement('div');
+      seg.className = 'tseg';
+      seg.style.flex = w;
+      seg.style.background = s.col;
+      seg.style.animation = `grow-x .6s ${0.15 + i * 0.1 + j * 0.05}s both cubic-bezier(.2,.7,.3,1)`;
+      seg.textContent = w > 11 ? pct(v / tot) + '%' : '';
+      bindTip(seg, `<b>${model}</b><br>${s.label}<br>${v} / ${tot} episodes (${pct(v / tot)}%)`);
+      bar.appendChild(seg);
+    });
+    tHost.appendChild(row);
+  });
+  document.getElementById('bandnote').innerHTML =
+    `Overall transmission: between <b>${minT}%</b> (recognised verbatim, safe lower bound) and <b>${maxT}%</b> ` +
+    `(including “spoke, not recognised”). The truth lies within this range — the engine can't adjudicate paraphrases.`;
+
+  // table
+  document.querySelector('#ttable tbody').innerHTML = Object.entries(data.transmission).map(([model, m]) => {
+    const tot = m.reconnu + m.parle + m.jamais;
+    return `<tr><td>${model}</td><td>${tot}</td><td>${m.reconnu}</td><td>${m.parle}</td><td>${m.jamais}</td></tr>`;
+  }).join('');
+
+  // ---------- Funnel ----------
+  const fStart = data.funnel[0].n;
+  document.getElementById('funnel').innerHTML = data.funnel.map((f, i) => {
+    const w = (f.n / fStart) * 100;
+    return `<div class="fn-row">
+      <div class="fn-label">${f.label}</div>
+      <div class="fn-track">
+        <div class="fn-fill" style="width:${w}%;animation:grow-x .6s ${0.1 + i * 0.08}s both cubic-bezier(.2,.7,.3,1)">
+          <span class="n">${f.n}</span>
+        </div>
+        <span class="fn-pct" style="position:absolute;top:5px;left:calc(${w}% + 8px)">${pct(f.n / fStart)}%</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ---------- Detection ----------
+  document.getElementById('detection').innerHTML = Object.entries(data.detection).map(([model, d], i) => {
+    const r = d.reussies / d.total, w = pct(r);
+    const col = r >= 0.6 ? C.jamais : (r >= 0.4 ? C.parle : C.reconnu);
+    return `<div class="det-row">
+      <div class="det-top"><span class="det-name">${model}</span><span class="det-val">${w}% <span style="color:var(--muted)">(${d.reussies}/${d.total})</span></span></div>
+      <div class="det-track"><div class="det-fill" style="width:${w}%;background:${col};animation:grow-x .6s ${0.15 + i * 0.1}s both cubic-bezier(.2,.7,.3,1)"></div></div>
+    </div>`;
+  }).join('');
+
+  // ---------- Tokens ----------
+  const tk = data.tokens, maxTok = Math.max(...tk), meanTok = tk.reduce((a, b) => a + b, 0) / tk.length;
+  const tHostTok = document.getElementById('tokens');
+  tk.forEach((v, i) => {
+    const b = document.createElement('div');
+    b.className = 'tok-bar';
+    b.style.height = (v / maxTok * 100) + '%';
+    b.style.animation = `grow-y .5s ${0.1 + i * 0.02}s both cubic-bezier(.2,.7,.3,1)`;
+    bindTip(b, `<b>seed ${1000 + i}</b><br>${v.toLocaleString('en-US')} tokens`);
+    tHostTok.appendChild(b);
+  });
+  const meanLine = document.createElement('div');
+  meanLine.className = 'tok-mean';
+  meanLine.style.bottom = (meanTok / maxTok * 100) + '%';
+  meanLine.innerHTML = `<span>avg ${Math.round(meanTok / 1000)}k</span>`;
+  tHostTok.appendChild(meanLine);
+  document.getElementById('tokmean-lbl').textContent = 'mean ' + Math.round(meanTok / 1000) + 'k tokens';
+
+  // ---------- Codes ----------
+  const modelTag = { mistral: 'mistral-small', gemini: 'gemini-2.5-flash' };
+  document.getElementById('codes').innerHTML = data.codes.map(c => `
+    <div class="code">
+      <div class="sig">« ${c.sig} »</div>
+      <div class="row">
+        <span class="tag">${modelTag[c.model]}</span>
+        <span class="pill ${c.busted ? 'busted' : 'safe'}">${c.busted ? 'blown' : 'intact'}</span>
+      </div>
+    </div>`).join('');
+})();
+</script>

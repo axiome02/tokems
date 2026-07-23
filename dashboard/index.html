@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kems-Bench — dashboard</title>
+<style>
+  :root {
+    --ground:#EFF2EF; --surface:#FFFFFF; --surface-2:#F6F8F6;
+    --ink:#151E1A; --ink-soft:#5C6862; --ink-faint:#8A958F;
+    --rule:#D8DED9; --accent:#1B5E4A; --brass:#8A6420;
+    --feutre:#1E5B48; --feutre-2:#17493A;
+    --eq0:#1D63A8; --eq1:#B3312B;
+    --ok:#1B6E4E; --bad:#A03528; --ok-bg:#E4EFE9; --bad-bg:#F7E8E5; --warn:#8A6420;
+    --carte-fg:#1A2420; --carte-bg:#FDFDFB; --rouge:#B23B2E;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --ground:#0D1411; --surface:#141C18; --surface-2:#19221E;
+    --ink:#E3EAE5; --ink-soft:#98A49D; --ink-faint:#6E7A74;
+    --rule:#28322C; --accent:#69BA9E; --brass:#CFA25A;
+    --feutre:#14483A; --feutre-2:#0F3A2E;
+    --eq0:#6FA8DC; --eq1:#E8756C;
+    --ok:#6FC69C; --bad:#E08878; --ok-bg:#14261F; --bad-bg:#2C1A16; --warn:#CFA25A;
+  } }
+  :root[data-theme="dark"] {
+    --ground:#0D1411; --surface:#141C18; --surface-2:#19221E;
+    --ink:#E3EAE5; --ink-soft:#98A49D; --ink-faint:#6E7A74;
+    --rule:#28322C; --accent:#69BA9E; --brass:#CFA25A;
+    --feutre:#14483A; --feutre-2:#0F3A2E;
+    --eq0:#6FA8DC; --eq1:#E8756C;
+    --ok:#6FC69C; --bad:#E08878; --ok-bg:#14261F; --bad-bg:#2C1A16; --warn:#CFA25A;
+  }
+  :root[data-theme="light"] {
+    --ground:#EFF2EF; --surface:#FFFFFF; --surface-2:#F6F8F6;
+    --ink:#151E1A; --ink-soft:#5C6862; --ink-faint:#8A958F;
+    --rule:#D8DED9; --accent:#1B5E4A; --brass:#8A6420;
+    --feutre:#1E5B48; --feutre-2:#17493A;
+    --eq0:#1D63A8; --eq1:#B3312B;
+    --ok:#1B6E4E; --bad:#A03528; --ok-bg:#E4EFE9; --bad-bg:#F7E8E5; --warn:#8A6420;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink); font-size:15px; line-height:1.5;
+         font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  h1 { font-family:Georgia,serif; font-size:1.05rem; margin:0; font-weight:600; }
+  h2 { font-size:.9rem; margin:0; font-weight:650; }
+  .eyebrow { font-size:.64rem; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-faint); font-weight:600; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+
+  button, select, input {
+    font:inherit; font-size:.82rem; color:var(--ink); background:var(--surface-2);
+    border:1px solid var(--rule); border-radius:3px; padding:.28rem .55rem;
+  }
+  button { cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--accent); }
+  button:disabled { opacity:.4; cursor:default; }
+  button[aria-pressed="true"] { background:var(--accent); color:var(--surface); border-color:var(--accent); }
+  button.cta { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  :focus-visible { outline:2px solid var(--brass); outline-offset:2px; }
+
+  .bar { position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--rule);
+         padding:.6rem 1rem; display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap; }
+  .stat { display:flex; flex-direction:column; line-height:1.15; }
+  .stat b { font-size:1rem; font-variant-numeric:tabular-nums; font-family:ui-monospace,Menlo,monospace; }
+  .spacer { margin-left:auto; }
+  .dot { width:.55rem; height:.55rem; border-radius:50%; background:var(--ink-faint); flex:none; }
+  .dot.on { background:var(--ok); animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  .grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:1rem; padding:1rem; align-items:start; }
+  @media (max-width:70rem){ .grid{ grid-template-columns:1fr; } }
+  .panel { background:var(--surface); border:1px solid var(--rule); border-radius:4px; overflow:hidden; }
+  .panel > header { padding:.5rem .8rem; border-bottom:1px solid var(--rule); background:var(--surface-2);
+                    display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+  .panel > .body { padding:.7rem .8rem; }
+  .stack { display:flex; flex-direction:column; gap:1rem; }
+
+  /* ── la table ── */
+  .table { background:linear-gradient(160deg,var(--feutre),var(--feutre-2)); padding:1rem;
+           display:grid; grid-template-columns:1fr auto 1fr; grid-template-rows:auto auto auto;
+           gap:.7rem; align-items:center; justify-items:center; position:relative; }
+  .siege { background:rgba(0,0,0,.24); border-radius:5px; padding:.5rem .6rem; min-width:9.5rem;
+           display:flex; flex-direction:column; gap:.3rem; align-items:center; color:#EAF2EE;
+           border:1px solid transparent; transition:border-color .25s, background .25s; }
+  .siege.actif { border-color:var(--brass); background:rgba(0,0,0,.4); }
+  .siege .nom { font-weight:650; font-size:.85rem; }
+  .siege .meta { font-size:.66rem; opacity:.7; }
+  .siege.t0 { background:rgba(29,99,168,.34); box-shadow:inset 0 0 0 1px rgba(120,180,240,.35); }
+  .siege.t1 { background:rgba(179,49,43,.34); box-shadow:inset 0 0 0 1px rgba(240,150,140,.35); }
+  .siege.t0 .nom { color:#BEDCF5; } .siege.t1 .nom { color:#F7C3BE; }
+  .puce { display:inline-block; width:.6rem; height:.6rem; border-radius:50%; flex:none; }
+  .puce.t0 { background:var(--eq0); } .puce.t1 { background:var(--eq1); }
+  .ligne.t0 { box-shadow:inset 3px 0 0 var(--eq0); } .ligne.t1 { box-shadow:inset 3px 0 0 var(--eq1); }
+  .ligne.t0.now, .ligne.t1.now { box-shadow:inset 3px 0 0 var(--brass); }
+  .legende { display:flex; gap:.7rem; align-items:center; font-size:.75rem; color:var(--ink-soft); }
+  .centre { grid-column:2; grid-row:2; display:flex; gap:.4rem; padding:.6rem .7rem;
+            background:rgba(0,0,0,.2); border-radius:5px; }
+  .p1 { grid-column:2; grid-row:1; } .p3 { grid-column:2; grid-row:3; }
+  .p2 { grid-column:1; grid-row:2; } .p4 { grid-column:3; grid-row:2; }
+  .mains { display:flex; gap:.25rem; }
+
+  .carte { width:2.3rem; height:3.2rem; border-radius:4px; background:var(--carte-bg); color:var(--carte-fg);
+           display:flex; align-items:center; justify-content:center; font-weight:650; font-size:.9rem;
+           font-family:ui-monospace,Menlo,monospace; box-shadow:0 1px 3px rgba(0,0,0,.35); flex:none;
+           transition:transform .2s; }
+  .carte.rouge { color:var(--rouge); }
+  .carte.dos { background:repeating-linear-gradient(45deg,#2C6B57,#2C6B57 4px,#245A49 4px,#245A49 8px);
+               color:transparent; box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
+  .carte.neuve { animation:pose .4s ease-out; }
+  @keyframes pose { from{ transform:translateY(-14px) scale(.9); opacity:0 } to{ transform:none; opacity:1 } }
+  .carte.vole { position:fixed; z-index:50; margin:0; transition:left .45s cubic-bezier(.4,0,.2,1),
+                top .45s cubic-bezier(.4,0,.2,1), transform .45s; pointer-events:none; }
+  @media (prefers-reduced-motion:reduce){ .carte,.carte.vole{ transition:none; animation:none } .dot.on{animation:none} }
+  .badge { font-size:.58rem; letter-spacing:.07em; text-transform:uppercase; font-weight:700;
+           padding:.1em .35em; border-radius:2px; background:#E8C88A; color:#3A2A08; }
+
+  /* ── stepper ── */
+  .stepper { display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; padding:.6rem .8rem;
+             border-top:1px solid var(--rule); background:var(--surface-2); }
+  .stepper input[type=range] { flex:1; min-width:8rem; accent-color:var(--accent); padding:0; }
+  .quoi { padding:.5rem .8rem; border-top:1px solid var(--rule); display:flex; gap:.5rem; align-items:baseline; }
+  .quoi .tag { font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; font-weight:700;
+               padding:.12em .4em; border-radius:2px; background:var(--surface-2); color:var(--ink-faint); flex:none; }
+  .tag.SWAP,.tag.PASS{ background:var(--surface-2); color:var(--ink-soft); }
+  .tag.MESSAGE{ background:var(--ok-bg); color:var(--ok); }
+  .tag.CALL{ background:var(--bad-bg); color:var(--bad); }
+  .tag.REFLEXION{ background:#EDE9F2; color:#6A5F80; }
+  .tag.NEGOTIATION,.tag.RIPOSTE{ background:#F5EEDF; color:var(--warn); }
+  @media (prefers-color-scheme:dark){ .tag.REFLEXION{ background:#221F2A; color:#B4A8CC } .tag.NEGOTIATION,.tag.RIPOSTE{ background:#282116 } }
+
+  /* ── listes ── */
+  .flux { max-height:17rem; overflow-y:auto; overscroll-behavior:contain;
+          display:flex; flex-direction:column; gap:.2rem; }
+  a { color:inherit; text-decoration:none; }
+  .ligne { padding:.25rem .4rem; border-radius:3px; display:flex; gap:.45rem; align-items:baseline; font-size:.88rem; }
+  .ligne .t { font-size:.66rem; color:var(--ink-faint); width:1.9rem; flex:none; font-family:ui-monospace,Menlo,monospace; }
+  .ligne.msg { background:var(--surface-2); }
+  .ligne.call { background:var(--bad-bg); color:var(--bad); font-weight:600; }
+  .ligne.sys { color:var(--warn); font-size:.82rem; }
+  .ligne.now { box-shadow:inset 2px 0 0 var(--brass); }
+  .refl { border-left:2px solid var(--rule); padding:.3rem .5rem; font-size:.85rem; color:var(--ink-soft); }
+  .refl b { color:var(--ink); font-size:.8rem; }
+  .refl.now { border-left-color:var(--brass); background:var(--surface-2); }
+  .e0{ color:var(--eq0) } .e1{ color:var(--eq1) }
+  .vide { color:var(--ink-faint); font-style:italic; font-size:.85rem; }
+
+  /* ── formulaire de lancement ── */
+  dialog { border:1px solid var(--rule); border-radius:6px; background:var(--surface); color:var(--ink);
+           padding:0; max-width:44rem; width:calc(100vw - 2rem); }
+  dialog::backdrop { background:rgba(0,0,0,.5); }
+  .form { padding:1rem; display:flex; flex-direction:column; gap:.9rem; }
+  .rangee { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; }
+  .champ { display:flex; flex-direction:column; gap:.15rem; }
+  .champ input, .champ select { width:100%; }
+  table { border-collapse:collapse; width:100%; font-size:.82rem; }
+  th,td { padding:.3rem .4rem; border-bottom:1px solid var(--rule); text-align:left; }
+  th { font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .err { color:var(--bad); font-size:.85rem; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="dot" id="dot"></span>
+  <h1>Kems-Bench</h1>
+  <div class="stat"><span class="eyebrow">Round</span><b id="s-manche">—</b></div>
+  <div class="stat"><span class="eyebrow">Turn</span><b id="s-tour">—</b></div>
+  <div class="stat"><span class="eyebrow">Score</span><b id="s-score">—</b></div>
+  <div class="stat"><span class="eyebrow">Tokens</span><b id="s-tok">—</b></div>
+  <div class="legende">
+    <span class="puce t0"></span> Team 0
+    <span class="puce t1"></span> Team 1
+  </div>
+  <div class="spacer"></div>
+  <button id="b-nego" aria-pressed="true">Negotiation</button>
+  <button id="b-refl" aria-pressed="true">Reflections</button>
+  <button id="b-secrets" aria-pressed="false">Reveal hands</button>
+  <a id="b-dl" href="partie.txt" download hidden><button type="button">⤓ Summary .txt</button></a>
+  <button id="b-theme">Theme</button>
+  <button class="cta" id="b-nouvelle">New game</button>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <header><h2>Table</h2><span class="eyebrow" id="s-phase"></span></header>
+    <div class="table" id="table">
+      <div class="siege p1" id="siege-0"></div>
+      <div class="siege p2" id="siege-1"></div>
+      <div class="centre" id="centre"></div>
+      <div class="siege p4" id="siege-3"></div>
+      <div class="siege p3" id="siege-2"></div>
+    </div>
+    <div class="quoi"><span class="tag" id="q-tag">—</span><span id="q-texte" class="vide">Waiting for a game…</span></div>
+    <div class="stepper">
+      <button id="b-first" title="Start">⏮</button>
+      <button id="b-tour-prev" title="Previous turn">◀◀</button>
+      <button id="b-prev" title="Previous action">◀</button>
+      <input type="range" id="scrub" min="0" max="0" value="0">
+      <button id="b-next" title="Next action">▶</button>
+      <button id="b-tour-next" title="Next turn">▶▶</button>
+      <button id="b-live" aria-pressed="true" title="Follow live">⏭ live</button>
+      <span class="mono eyebrow" id="s-pos">0 / 0</span>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="panel">
+      <header><h2>Public chat</h2><span class="eyebrow">read by all 4 players</span></header>
+      <div class="body"><div class="flux" id="chat"><p class="vide">Nothing yet.</p></div></div>
+    </div>
+    <div class="panel" id="pan-nego">
+      <header><h2>Signal negotiation</h2><span class="eyebrow">before the game, per team</span></header>
+      <div class="body"><div class="flux" id="negociation"><p class="vide">Nothing yet.</p></div></div>
+    </div>
+    <div class="panel" id="pan-refl">
+      <header><h2>Private reflections</h2><span class="eyebrow">inner monologue, seen by no one</span></header>
+      <div class="body"><div class="flux" id="reflexions"><p class="vide">Nothing yet.</p></div></div>
+    </div>
+    <div class="panel">
+      <header><h2>Signaling episodes</h2></header>
+      <div class="body" id="episodes"><p class="vide">No square formed.</p></div>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" class="form" id="form">
+    <h1>New game</h1>
+    <div class="rangee">
+      <label class="champ"><span class="eyebrow">Card seed</span>
+        <input type="number" id="f-seed-cards" value="11"></label>
+      <label class="champ"><span class="eyebrow">Order seed</span>
+        <input type="number" id="f-seed-order" value="22"></label>
+      <button type="button" id="b-hasard">🎲 Random</button>
+    </div>
+    <div class="rangee">
+      <label class="champ"><span class="eyebrow">Ranks</span><input type="number" id="f-rangs" value="10" min="4" max="13"></label>
+      <label class="champ"><span class="eyebrow">Max turns</span><input type="number" id="f-tours" value="8" min="1"></label>
+      <label class="champ"><span class="eyebrow">Rounds to play</span>
+        <select id="f-manches"></select></label>
+      <label class="champ"><span class="eyebrow">Points to win</span>
+        <input type="number" id="f-points" value="2" min="1"
+               title="Setting a value ≤ the number of rounds ends the match as soon as a team reaches it."></label>
+      <label class="champ"><span class="eyebrow">API pause (s)</span><input type="number" id="f-pause" value="0.5" step="0.5" min="0"></label>
+    </div>
+    <table>
+      <thead><tr><th>Player</th><th>Team</th><th>Provider</th><th>Model</th><th>Temperature</th></tr></thead>
+      <tbody id="f-joueurs"></tbody>
+    </table>
+    <p class="err" id="f-err" hidden></p>
+    <div class="rangee" style="justify-content:flex-end">
+      <button type="button" id="b-annuler">Cancel</button>
+      <button type="button" class="cta" id="b-lancer">Launch</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ROUGE = ["♥", "♦"];
+
+let data = null, idx = 0, suivre = true, secrets = false, precedent = -1;
+// vrai seulement quand l'utilisateur a bouge le curseur : le direct qui avance ne doit pas
+// arracher le defilement a quelqu'un en train de lire plus haut.
+let navManuelle = false;
+
+/* ── thème ── */
+const memo = localStorage.getItem("kems-theme");
+if (memo) document.documentElement.dataset.theme = memo;
+$("b-theme").onclick = () => {
+  const sombre = getComputedStyle(document.body).backgroundColor === "rgb(13, 20, 17)";
+  const t = sombre ? "light" : "dark";
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem("kems-theme", t);
+};
+$("b-secrets").onclick = e => { secrets = !secrets; e.target.setAttribute("aria-pressed", secrets); rendre(); };
+
+/* masquer/afficher les deux panneaux prives (choix memorise entre deux visites) */
+function panneau(btn, pan, cle) {
+  const b = $(btn), el = $(pan);
+  let visible = localStorage.getItem(cle) !== "0";
+  const appliquer = () => { el.hidden = !visible; b.setAttribute("aria-pressed", String(visible)); };
+  b.onclick = () => { visible = !visible; localStorage.setItem(cle, visible ? "1" : "0"); appliquer(); };
+  appliquer();
+}
+panneau("b-nego", "pan-nego", "kems-nego");
+panneau("b-refl", "pan-refl", "kems-refl");
+
+/* ── navigation ── */
+const tl = () => (data && data.timeline) || [];
+function aller(n, viaBouton = true) {
+  const max = Math.max(0, tl().length - 1);
+  idx = Math.min(Math.max(0, n), max);
+  if (viaBouton) majSuivre(idx >= max);
+  navManuelle = true;
+  rendre();
+}
+function majSuivre(v) { suivre = v; $("b-live").setAttribute("aria-pressed", String(v)); }
+function bordTour(dir) {
+  const t = tl(); if (!t.length) return idx;
+  const cur = t[idx].tour;
+  for (let i = idx + dir; i >= 0 && i < t.length; i += dir) if (t[i].tour !== cur) {
+    if (dir < 0) { const c2 = t[i].tour; while (i > 0 && t[i-1].tour === c2) i--; }
+    return i;
+  }
+  return dir < 0 ? 0 : t.length - 1;
+}
+$("b-first").onclick = () => aller(0);
+$("b-prev").onclick  = () => aller(idx - 1);
+$("b-next").onclick  = () => aller(idx + 1);
+$("b-tour-prev").onclick = () => aller(bordTour(-1));
+$("b-tour-next").onclick = () => aller(bordTour(1));
+$("b-live").onclick = () => { majSuivre(!suivre); if (suivre) aller(tl().length - 1, false); };
+$("scrub").oninput = e => aller(+e.target.value);
+addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowLeft") { aller(idx - 1); e.preventDefault(); }
+  if (e.key === "ArrowRight") { aller(idx + 1); e.preventDefault(); }
+});
+
+/* ── rendu de la table ── */
+const carteHTML = (c, cls = "") =>
+  `<span class="carte ${ROUGE.some(s => c.includes(s)) ? "rouge" : ""} ${cls}" data-c="${esc(c)}">${esc(c)}</span>`;
+
+function rendreTable(etape) {
+  const joueurs = data.joueurs || [];
+  $("centre").innerHTML = (etape.centre || []).map(c => carteHTML(c)).join("");
+  for (const j of joueurs) {
+    const el = $("siege-" + j.pid); if (!el) continue;
+    const main = (etape.mains || {})[j.pid] || [];
+    const cartes = main.map(c => secrets ? carteHTML(c) : `<span class="carte dos">·</span>`).join("");
+    const carre = secrets && main.length === 4 && new Set(main.map(c => c.replace(/[♠♥♦♣]/, ""))).size === 1;
+    el.className = `siege p${j.pid + 1} t${j.equipe}` + (etape.pid === j.pid ? " actif" : "");
+    el.innerHTML = `<span class="nom">${esc(j.nom)}${carre ? ' <span class="badge">square</span>' : ""}</span>`
+                 + `<span class="meta">${esc(j.modele)}</span><div class="mains">${cartes}</div>`;
+  }
+}
+
+/* Animation : la carte prise s'envole du centre vers le siège, la reposée fait l'inverse. */
+function animer(etape) {
+  if (etape.type !== "SWAP" || !etape.prise) return;
+  const siege = $("siege-" + etape.pid); if (!siege) return;
+  const depart = [...$("centre").children].find(e => e.dataset.c === etape.repose) || $("centre");
+  vol(etape.prise, $("centre").getBoundingClientRect(), siege.getBoundingClientRect());
+  vol(etape.repose, siege.getBoundingClientRect(), depart.getBoundingClientRect());
+}
+function vol(carte, de, vers) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const el = document.createElement("span");
+  el.className = `carte vole ${ROUGE.some(s => carte.includes(s)) ? "rouge" : ""}`;
+  el.textContent = carte;
+  el.style.left = de.left + de.width / 2 - 18 + "px";
+  el.style.top = de.top + de.height / 2 - 25 + "px";
+  document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    el.style.left = vers.left + vers.width / 2 - 18 + "px";
+    el.style.top = vers.top + vers.height / 2 - 25 + "px";
+    el.style.transform = "scale(.85)";
+  });
+  setTimeout(() => el.remove(), 480);
+}
+
+/* ── panneaux ── */
+/* Ne réécrit une boîte que si son contenu a changé : réécrire innerHTML à chaque poll
+   remettait le défilement à zéro toutes les secondes, rendant tout scroll manuel impossible. */
+function majBoite(id, html, sig, navigue) {
+  const box = $(id);
+  if (box.dataset.sig === sig) return;
+  const avant = box.scrollTop;
+  const etaitEnBas = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+  box.innerHTML = html;
+  box.dataset.sig = sig;
+  const now = box.querySelector(".now");
+  if (navigue && now) now.scrollIntoView({ block: "nearest" });
+  else if (etaitEnBas) box.scrollTop = box.scrollHeight;
+  else box.scrollTop = avant;          // on respecte l'endroit où l'utilisateur s'était arrêté
+}
+
+function nomDe(pid) { return ((data.joueurs || []).find(x => x.pid === pid) || {}); }
+
+function rendreFlux(etapes, navigue) {
+  const chat = etapes.filter(e => ["MESSAGE", "CALL", "SYSTEM", "SWEEP"].includes(e.type));
+  majBoite("chat", chat.length ? chat.map(e => {
+    const cls = e.type === "MESSAGE" ? "msg" : e.type === "CALL" ? "call" : "sys";
+    const j = nomDe(e.pid);
+    const eq = j.equipe === undefined ? "" : ` t${j.equipe}`;
+    const puce = j.equipe === undefined ? "" : `<span class="puce t${j.equipe}"></span>`;
+    return `<div class="ligne ${cls}${eq} ${e.i === idx ? "now" : ""}"><span class="t">${e.tour || ""}</span>`
+         + puce + `<span>${esc(e.texte)}</span></div>`;
+  }).join("") : '<p class="vide">Nothing yet.</p>', `c${chat.length}:${idx}`, navigue);
+
+  const nego = etapes.filter(e => e.type === "NEGOTIATION");
+  majBoite("negociation", nego.length ? nego.map(e => {
+    const j = nomDe(e.pid);
+    const det = [e.proposition ? `proposal: ${esc(e.proposition)}` : "",
+                 e.declencheur ? `trigger: <span class="mono">${esc(e.declencheur)}</span>` : "",
+                 e.accord ? "<b>agreed</b>" : ""].filter(Boolean).join(" · ");
+    return `<div class="refl ${e.i === idx ? "now" : ""}"><b class="e${j.equipe}">${esc(j.nom || "?")}</b>`
+         + ` <span class="eyebrow">team ${j.equipe}</span><br>${esc(e.prive || "")}`
+         + (det ? `<br><span class="eyebrow">${det}</span>` : "") + `</div>`;
+  }).join("") : '<p class="vide">Nothing yet.</p>', `n${nego.length}:${idx}`, navigue);
+
+  const refs = etapes.filter(e => ["REFLEXION", "RIPOSTE"].includes(e.type) && e.prive);
+  majBoite("reflexions", refs.length ? refs.map(e => {
+    const j = nomDe(e.pid);
+    return `<div class="refl ${e.i === idx ? "now" : ""}"><b class="e${j.equipe}">${esc(j.nom || "?")}</b>`
+         + ` <span class="eyebrow">${esc(e.type)} · T${e.tour}</span><br>${esc(e.prive)}</div>`;
+  }).join("") : '<p class="vide">Nothing yet.</p>', `r${refs.length}:${idx}`, navigue);
+}
+
+function rendreEpisodes() {
+  const eps = data.episodes || [];
+  if (!eps.length) { $("episodes").innerHTML = '<p class="vide">No square formed.</p>'; return; }
+  $("episodes").innerHTML = eps.map(e => {
+    const nom = ((data.joueurs || []).find(j => j.pid === e.pid) || {}).nom || "?";
+    const et = [`<span class="tag" style="background:var(--ok-bg);color:var(--ok)">square T${e.tour_carre}</span>`];
+    et.push(e.tour_signal ? `<span class="tag" style="background:var(--ok-bg);color:var(--ok)">signal T${e.tour_signal}</span>`
+          : e.tour_parole ? `<span class="tag">spoke T${e.tour_parole}</span>`
+          : `<span class="tag" style="background:var(--bad-bg);color:var(--bad)">never spoke</span>`);
+    et.push(e.capte ? `<span class="tag" style="background:var(--ok-bg);color:var(--ok)">caught T${e.tour_kemps}</span>`
+                    : `<span class="tag" style="background:var(--bad-bg);color:var(--bad)">not caught</span>`);
+    if (e.demasque != null) et.push(e.demasque
+      ? `<span class="tag" style="background:var(--bad-bg);color:var(--bad)">unmasked</span>`
+      : `<span class="tag" style="background:var(--ok-bg);color:var(--ok)">stayed secret</span>`);
+    return `<div style="margin-bottom:.4rem"><b>${esc(nom)}</b> ${et.join(" ")}</div>`;
+  }).join("");
+}
+
+function rendre() {
+  if (!data) return;
+  const t = tl();
+  $("dot").className = "dot" + (data.en_cours ? " on" : "");
+  $("s-manche").textContent = data.manche;
+  $("s-tour").textContent = data.tour;
+  $("s-score").textContent = `${data.scores?.["0"] ?? 0} – ${data.scores?.["1"] ?? 0}`;
+  $("s-tok").textContent = (data.tokens?.grand_total ?? 0).toLocaleString("en-US");
+  $("s-phase").textContent = data.en_cours ? data.phase : "match finished";
+  if (!t.length) return;
+
+  const etape = t[idx];
+  $("scrub").max = t.length - 1; $("scrub").value = idx;
+  $("s-pos").textContent = `${idx + 1} / ${t.length}`;
+  $("q-tag").textContent = etape.type; $("q-tag").className = "tag " + etape.type;
+  $("q-texte").textContent = etape.texte; $("q-texte").className = "";
+  for (const [b, on] of [["b-prev", idx > 0], ["b-first", idx > 0], ["b-tour-prev", idx > 0],
+                         ["b-next", idx < t.length - 1], ["b-tour-next", idx < t.length - 1]])
+    $(b).disabled = !on;
+
+  rendreTable(etape);
+  const navigue = navManuelle;
+  navManuelle = false;
+  if (idx === precedent + 1) animer(etape);
+  precedent = idx;
+  rendreFlux(t.slice(0, idx + 1), navigue);
+  rendreEpisodes();
+  const dl = $("b-dl");
+  dl.hidden = !data.transcript;
+  if (data.transcript) dl.setAttribute("download", data.transcript);
+}
+
+/* ── formulaire ── */
+const MODELES = { mistral: ["mistral-small-latest", "mistral-medium-latest", "mistral-large-latest"],
+                  gemini: ["gemini-flash-lite-latest", "gemini-flash-latest"],
+                  gpt: ["gpt-4o-mini"], claude: ["claude-haiku-4-5-20251001"],
+                  kimi: ["moonshot-v1-8k"] };
+$("f-joueurs").innerHTML = [0, 1, 2, 3].map(i => `
+  <tr><td>Player ${i + 1}</td><td class="e${i % 2}">${i % 2}</td>
+    <td><select data-r="agent" data-i="${i}">${Object.keys(MODELES).map(k => `<option>${k}</option>`).join("")}</select></td>
+    <td><select data-r="model" data-i="${i}">${MODELES.mistral.map(m => `<option>${m}</option>`).join("")}</select></td>
+    <td><input type="number" data-r="temperature" data-i="${i}" value="0.7" step="0.1" min="0" max="2" style="width:5rem"></td>
+  </tr>`).join("");
+$("f-joueurs").addEventListener("change", e => {
+  if (e.target.dataset.r !== "agent") return;
+  const sel = $("f-joueurs").querySelector(`[data-r="model"][data-i="${e.target.dataset.i}"]`);
+  sel.innerHTML = MODELES[e.target.value].map(m => `<option>${m}</option>`).join("");
+});
+const champ = (r, i) => $("f-joueurs").querySelector(`[data-r="${r}"][data-i="${i}"]`).value;
+
+/* Manches 1 à 5. Par défaut on cale « points pour gagner » au-dessus du nombre de manches :
+   toutes les manches sont alors jouées, ce qui permet d'observer si une équipe s'adapte
+   après s'être fait démasquer. Le champ reste modifiable pour un vrai « premier à N ». */
+$("f-manches").innerHTML = [1, 2, 3, 4, 5].map(n =>
+  `<option value="${n}"${n === 3 ? " selected" : ""}>${n} round${n > 1 ? "s" : ""}</option>`).join("");
+const calerPoints = () => { $("f-points").value = +$("f-manches").value + 1; };
+$("f-manches").onchange = calerPoints;
+calerPoints();
+$("b-nouvelle").onclick = () => $("dlg").showModal();
+$("b-annuler").onclick = () => $("dlg").close();
+$("b-hasard").onclick = () => {
+  $("f-seed-cards").value = Math.floor(Math.random() * 1e6);
+  $("f-seed-order").value = Math.floor(Math.random() * 1e6);
+};
+$("b-lancer").onclick = async () => {
+  const err = $("f-err"); err.hidden = true;
+  const reglages = {
+    seed: +$("f-seed-cards").value,
+    seed_cards: +$("f-seed-cards").value, seed_order: +$("f-seed-order").value,
+    nb_rangs: +$("f-rangs").value, max_tours: +$("f-tours").value,
+    max_manches: +$("f-manches").value, points: +$("f-points").value,
+    pause: +$("f-pause").value,
+    joueurs: [0, 1, 2, 3].map(i => ({ agent: champ("agent", i), model: champ("model", i),
+                                      temperature: +champ("temperature", i) })),
+  };
+  try {
+    const r = await fetch("/api/lancer", { method: "POST", body: JSON.stringify(reglages) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.erreur || "failed");
+    $("dlg").close(); majSuivre(true); idx = 0; precedent = -1;
+  } catch (e) { err.textContent = "Could not launch: " + e.message; err.hidden = false; }
+};
+
+/* ── boucle de rafraîchissement ── */
+async function boucle() {
+  try {
+    const r = await fetch("state.json?t=" + Date.now(), { cache: "no-store" });
+    if (r.ok) {
+      data = await r.json();
+      if (suivre) idx = Math.max(0, tl().length - 1);
+      rendre();
+    }
+  } catch (e) { /* pas encore de partie : on reessaie */ }
+  try {
+    const s = await (await fetch("/api/statut")).json();
+    if (s.erreur) { $("f-err").textContent = s.erreur; $("f-err").hidden = false; }
+  } catch (e) {}
+  setTimeout(boucle, 1000);
+}
+boucle();
+})();
+</script>
+</body>
+</html>
