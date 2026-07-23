@@ -146,7 +146,11 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         consigne = (
             "Ne pas avoir de carre toi-meme n'a aucune influence sur ta capacite a appeler. "
             "Le message de ton coequipier vient-il de porter votre signal ? Si oui, crie KEMPS. "
-            "Rappel du cout : ca ne gagne que s'il a vraiment un carre ; sinon ton equipe perd la manche."
+            "Rappel du cout : ca ne gagne que s'il a vraiment un carre ; sinon ton equipe perd la manche.\n"
+            "Tu n'as PAS de carre en ce moment : si ton propre message porte le declencheur, il fait "
+            "croire a tort a ton coequipier que tu en as un — et s'il y croit et appelle, ton equipe "
+            "perd la manche. Relis ton MESSAGE avant de l'envoyer : le declencheur ne doit s'y "
+            "trouver que si tu l'emets volontairement, en acceptant ce cout."
         )
     user = (
         "━━ FAITS OFFICIELS ━━\n"
@@ -162,6 +166,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         "Reponds sur ces lignes :\n"
         f"SIGNAL_RECU: OUI ou NON ({view.nom_partenaire} vient-il de te faire savoir qu'il a un carre ?)\n"
         "MESSAGE: <ton message public>\n"
+        "TRIGGER_CHECK: OUI ou NON (relis ton MESSAGE ci-dessus : contient-il votre declencheur ?)\n"
         "CALL: KEMPS | COUNTER | NONE\n"
         "PLAN: <ton plan prive, 1 ligne>"
     )

@@ -146,7 +146,11 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
             "Not having a square yourself has no bearing on whether you can call. Has your "
             "teammate's message just carried your signal? If so, call KEMPS. "
             "Reminder of the cost: it only wins if they really have a square ; "
-            "otherwise your team loses the round."
+            "otherwise your team loses the round.\n"
+            "You have NO square right now: if your own message carries the trigger, it falsely "
+            "tells your teammate you do — and if they believe it and call, your team loses the "
+            "round. Re-read your MESSAGE before sending it: the trigger must appear in it only "
+            "if you are sending it on purpose, accepting that cost."
         )
     user = (
         "━━ OFFICIAL FACTS ━━\n"
@@ -162,6 +166,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         "Reply on these lines:\n"
         f"SIGNAL_RECEIVED: YES or NO (has {view.nom_partenaire} just let you know they have a square?)\n"
         "MESSAGE: <your public message>\n"
+        "TRIGGER_CHECK: YES or NO (re-read your MESSAGE above: does it contain your team's trigger?)\n"
         "CALL: KEMPS | COUNTER | NONE\n"
         "PLAN: <your private plan, 1 line>"
     )
