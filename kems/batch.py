@@ -80,6 +80,10 @@ def extraire_partie(state, usage: dict, seed: int) -> dict:
         "score_1": state.scores[1],
         "nb_manches": len(state.historique_manches),
         "nb_tours": state.tour,
+        # scellage notarie : True = accord prouve (read-back), False = fige au plafond sans
+        # convergence. Reflete la DERNIERE negociation de l'equipe (renegociation comprise).
+        "nego_convergence_0": state.nego_convergence.get(0),
+        "nego_convergence_1": state.nego_convergence.get(1),
         "tokens_total": usage.get("grand_total", 0),
         "nb_episodes": len(state.episodes),
         # paris a l'aveugle : KEMPS crie sans qu'aucun declencheur n'ait ete repere (voir CLAUDE.md,
