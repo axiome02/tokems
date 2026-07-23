@@ -28,13 +28,15 @@ class PlayerView:
 
     nego_proposition: str = ""           # negociation : le signal candidat en cours de discussion
     nego_declencheur: str = ""           # negociation : le declencheur sur la table (a re-ecrire pour sceller)
+    nego_restants: int = 0               # negociation : echanges restants avant le figeage au plafond
     ma_reflexion: str = ""               # la reflexion privee que le joueur vient tout juste d'ecrire
     adversaires: list[str] = field(default_factory=list)   # public : noms de l'equipe adverse
 
 
 def vue_pour(state: GameState, pid: int,
              nego_proposition: str = "", chat_complet: bool = False,
-             reflexion: str = "", nego_declencheur: str = "") -> PlayerView:
+             reflexion: str = "", nego_declencheur: str = "",
+             nego_restants: int = 0) -> PlayerView:
     e = state.equipe_de(pid)
     fen = len(state.public_log) if chat_complet else state.config.fenetre_chat
     return PlayerView(
@@ -53,6 +55,7 @@ def vue_pour(state: GameState, pid: int,
         chat_global=list(state.public_log[-fen:]),
         nego_proposition=nego_proposition,
         nego_declencheur=nego_declencheur,
+        nego_restants=nego_restants,
         ma_reflexion=reflexion,
         adversaires=[p.nom for p in state.players if p.equipe != e],
     )

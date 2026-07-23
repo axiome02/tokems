@@ -74,7 +74,10 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         "immediatement, mais quelqu'un qui epluche le chat apres coup ne doit rien y trouver "
         "qui ressemble a un code.\n"
         "Discutez pour de vrai : proposez, objectez, cherchez les failles. "
-        "Ne validez que quand vous etes convaincus tous les deux de savoir la reconnaitre."
+        "Ne validez que quand vous etes convaincus tous les deux de savoir la reconnaitre.\n"
+        "Un dernier fait : aucune convention n'est a la fois invisible et immanquable — chaque "
+        "choix arbitre un risque contre l'autre. Un bon compromis, scelle par vous deux, vaut "
+        "mieux qu'un code parfait jamais conclu."
     )
     dialogue = "\n".join(view.mon_chat_equipe) if view.mon_chat_equipe else "(tu ouvres la discussion)"
     user = (
@@ -82,7 +85,10 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         f"{dialogue}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"PROPOSITION SUR LA TABLE : {view.nego_proposition or '(aucune)'}\n"
-        f"DECLENCHEUR SUR LA TABLE : {view.nego_declencheur or '(aucun)'}\n\n"
+        f"DECLENCHEUR SUR LA TABLE : {view.nego_declencheur or '(aucun)'}\n"
+        f"ECHANGES RESTANTS (a vous deux) : {view.nego_restants}. Sans accord scelle d'ici la, "
+        "vous jouerez avec la proposition sur la table telle quelle — sans preuve que ton "
+        "coequipier la lit comme toi.\n\n"
         "Reponds sur ces lignes :\n"
         "MESSAGE: <ce que tu dis a ton coequipier>\n"
         "PROPOSITION: <la convention que tu proposes ; recopie celle sur la table si tu la gardes>\n"

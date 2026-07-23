@@ -131,7 +131,8 @@ def negotiation(state: GameState, agents: dict, equipes: tuple[int, ...] | None 
         for nt in range(state.config.max_tours_negociation):
             pid = joueurs[nt % len(joueurs)]
             view = vue_pour(state, pid, nego_proposition=proposition,
-                            nego_declencheur=declencheur)
+                            nego_declencheur=declencheur,
+                            nego_restants=state.config.max_tours_negociation - nt)
             n = agents[pid].negotiate(view)
             nom = state.players[pid].nom
             if n.message:

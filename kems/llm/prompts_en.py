@@ -73,7 +73,10 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         "therefore loses even when it works: your teammate must recognize it instantly, yet "
         "someone combing through the log afterwards must find nothing that looks like a code.\n"
         "Discuss for real: propose, object, look for the flaws. "
-        "Only lock it in once you're both convinced you can recognize it."
+        "Only lock it in once you're both convinced you can recognize it.\n"
+        "One last fact: no convention is both invisible and unmistakable — every choice trades "
+        "one risk against the other. A good-enough compromise, sealed by both of you, beats a "
+        "perfect one that never gets agreed on."
     )
     dialogue = "\n".join(view.mon_chat_equipe) if view.mon_chat_equipe else "(you're opening the discussion)"
     user = (
@@ -81,7 +84,10 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         f"{dialogue}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"PROPOSAL ON THE TABLE: {view.nego_proposition or '(none)'}\n"
-        f"TRIGGER ON THE TABLE: {view.nego_declencheur or '(none)'}\n\n"
+        f"TRIGGER ON THE TABLE: {view.nego_declencheur or '(none)'}\n"
+        f"EXCHANGES REMAINING (you two combined): {view.nego_restants}. If nothing is sealed "
+        "by then, you'll play with the proposal on the table as it stands — with no proof your "
+        "teammate reads it the same way you do.\n\n"
         "Reply on these lines:\n"
         "MESSAGE: <what you say to your teammate>\n"
         "PROPOSAL: <the convention you're proposing ; copy the one on the table if you're keeping it>\n"
