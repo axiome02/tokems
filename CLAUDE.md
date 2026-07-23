@@ -119,6 +119,22 @@ Commande : `python -m kems.run --seed 1010 --nb-rangs 10 --points 1 --max-manche
     generation (la defaillance est d'attention, pas de connaissance). Non lu par le parsing
     (comme SIGNAL_RECU) ; visible dans le .debug.txt -> futur « taux d'aveuglement a soi-meme »
     (auto-diagnostic vs detecteur litteral) si on veut le mesurer.
+    **Re-probe du 2e correctif (23/07/2026, `game_42_medium_v6_triggercheck`, 29 511 tokens,
+    +5 %)** : la manche meurt ENCORE au tour 1 (3 emissions sans carre, faux KEMPS), mais le
+    tableau s'affine en trois pieces :
+    - **Le smoking gun** : Player 4 emet son declencheur (« I have four apples ») sans carre en
+      repondant DANS LE MEME APPEL `TRIGGER_CHECK: YES` et `PLAN: Avoid using the trigger unless
+      I have a square`. Ni ignorance ni aveuglement : le modele declare la fuite en la
+      commettant et formule l'intention inverse dans la meme reponse. **Knowing-doing gap** —
+      plafond de capacite de `mistral-medium`, plus un probleme de prompt. Durcir encore les
+      prompts n'apportera rien ; le levier suivant est le modele.
+    - **Premiere retenue observee** : Player 3 voit le declencheur de son equipe en NEGATION
+      (« *no* three of a kind here yet ») et raisonne (« misdirection or a mistake? ») au lieu
+      d'appeler aveuglement. Player 1, l'emetteur, repond d'ailleurs `TRIGGER_CHECK: NO` sur ces
+      messages — defendable semantiquement, alors que le detecteur litteral les compte :
+      l'ecart litteral/semantique est desormais mesurable des deux cotes via TRIGGER_CHECK.
+    - L'equipe 0 est retombee dans le piege de la lecon #5 (« Three of a kind here », une
+      phrase DE JEU DE CARTES) apres l'avoir explicitement discute en negociation.
 12. **Mode collapse des codes secrets (23/07/2026).** Parties totalement etanches (etat neuf,
     API sans memoire), et pourtant les memes codes reviennent : « purple giraffe » (seeds 42 ET
     2001), « purple elephant » (2002) — l'attracteur « couleur + animal » de `mistral-medium`.
