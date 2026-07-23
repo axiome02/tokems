@@ -24,7 +24,27 @@ public — mais reconnait quand meme « Kezako » et appelle correctement.
 
 Commande : `python -m kems.run --seed 1010 --nb-rangs 10 --points 1 --max-manches 1`
 
-### Historique des reglages (ce qui a ete essaye, et ce que ca a donne)
+### Partie de reference du FORMAT MATCH : `transcripts/game_42_medium_v8_horloge.txt`
+**23/07/2026, mistral-medium, seed 42, 44 729 tokens, 68 appels, 2 tours.** PREMIERE boucle
+complete propre en configuration finale (garde-fous retires + tous les correctifs du 23/07) :
+- Les DEUX equipes scellent leur accord (read-back), en citant les faits ajoutes le jour meme
+  (« No need to overcomplicate it further ») — l'horloge + l'arbitrage enonce font conclure.
+- Code de l'equipe 1, le plus sophistique jamais scelle : **structurel, porte par la
+  ponctuation** — « un mot de 4 lettres finissant par y suivi d'exactement TROIS points
+  d'exclamation ». Discrimination reelle a l'execution : « play!! » (2 marks, tour 1, sans
+  carre) n'a PAS declenche d'appel ; « Let's play!!! » (tour 2, avec carre de 6, emission
+  volontaire et assumee au monologue) -> Player 4 lit, KEMPS -> REUSSI.
+- Riposte : « demasque » sur la reponse « "enjoy the game" / "play" » — voir la limite
+  ci-dessous, c'est un artefact de normalisation, pas une vraie comprehension du code.
+
+⚠️ **Limite decouverte a cette partie : les codes STRUCTURELS vs la normalisation.**
+`signaux.normaliser` supprime la ponctuation avant comparaison. Consequence double sur un code
+porte par la ponctuation : (a) en riposte, nommer le simple mot « play » suffit a « demasquer »
+un code dont tout le secret etait les !!! — un code structurel est indefendable en riposte ;
+(b) en detection d'emission, « play!! » (qui n'est PAS le signal selon la regle de l'equipe)
+est quand meme compte comme emission sans carre. Le detecteur litteral SUR- et SOUS-detecte
+les codes structurels — meme famille de limite que la cecite aux paraphrases, a citer avec
+les memes precautions dans toute stat publiee.
 
 | Partie | Reglage teste | Tokens | Resultat |
 |---|---|---|---|
@@ -162,7 +182,18 @@ Commande : `python -m kems.run --seed 1010 --nb-rangs 10 --points 1 --max-manche
     **Et anti-confabulation** : l'en-tete de verite (reflexion + discussion, 2 langues) epingle
     desormais aussi le DECLENCHEUR EXACT (`view.mon_declencheur`) a cote de la convention —
     Player 3 n'avait confabule que parce que le moteur connaissait « le texte litteral » sans
-    jamais le reinjecter. Non remesure.
+    jamais le reinjecter.
+    **Complement (23/07/2026, meme jour) : l'horloge et l'arbitrage font conclure.** La
+    non-convergence residuelle (oscillation « trop voyant <-> trop naturel » pendant 10 tours,
+    cf. game_2000 post-correctifs : convergence 1/2) avait deux causes informationnelles :
+    les modeles ne voyaient pas le plafond d'echanges, et cherchaient un code parfait qui
+    n'existe pas. Deux FAITS ajoutes au prompt de negociation (EN/FR, regle de non-influence
+    respectee) : « ECHANGES RESTANTS : N » avec la consequence du figeage (jouer une
+    proposition non prouvee), et l'enonce de l'arbitrage structurel (aucune convention n'est
+    a la fois invisible et immanquable ; un compromis scelle vaut mieux qu'un code parfait
+    jamais conclu). **Effet immediat** (game_42_medium_v8) : convergence 2/2, les deux
+    clotures citant l'enonce (« no need to overcomplicate »), et premiere boucle complete
+    propre (voir la partie de reference du format match ci-dessus).
     - Au credit de large : la manche vit 2 tours pleins, 16 messages publics — le meilleur
       bavardage de couverture jamais produit (vannes suivies singe/raton laveur), et la regle
       de PREMIERE OCCURRENCE inventee par l'equipe 1 (declencheur valide seulement la premiere
