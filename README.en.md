@@ -98,7 +98,7 @@ In VSCode: open the integrated terminal (`` Ctrl+` ``) and run the command; or o
 
 ---
 
-## 4. Play with real models (Mistral / Gemini / GPT / Claude / Kimi)
+## 4. Play with real models (Mistral / Gemini / GPT / Claude / Kimi / GitHub)
 
 1. Create a `.env` file at the project root (copy of [`.env.example`](.env.example)):
    ```
@@ -107,12 +107,18 @@ In VSCode: open the integrated terminal (`` Ctrl+` ``) and run the command; or o
    OPENAI_API_KEY=your_openai_key
    ANTHROPIC_API_KEY=your_anthropic_key
    KIMI_API_KEY=your_kimi_key
+   GITHUB_TOKEN=your_github_token  # Optional: for querying GPT/Claude for free via GitHub Models
    ```
    `.env` is gitignored. You only need keys for the providers you actually use.
 
 2. Run a mixed game, live:
    ```powershell
    .\.venv\Scripts\python.exe -m kems.run --agents mistral,gemini,mistral,gemini --seed 42 --live
+   ```
+
+   If you configured `GITHUB_TOKEN`, you can run models (like `gpt-4o` or `claude-3-5-sonnet`) for free using the `github` provider:
+   ```powershell
+   .\.venv\Scripts\python.exe -m kems.run --agents github,github,github,github --model gpt-4o-mini --seed 42 --live
    ```
 
 Teams are: **team 0** = players 1 & 3, **team 1** = players 2 & 4 (in `--agents` order).

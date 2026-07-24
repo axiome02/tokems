@@ -11,6 +11,7 @@ from .dashboard import Pilote, Publieur, demarrer_serveur
 from .llm.env import load_env
 from .llm.anthropic import ClaudeClient
 from .llm.gemini import GeminiClient
+from .llm.github import GithubModelsClient
 from .llm.kimi import KimiClient
 from .llm.mistral import MistralClient
 from .llm.openai import OpenAIClient
@@ -37,6 +38,7 @@ def usage_summary(agents: dict) -> dict:
 CLIENTS = {
     "mistral": MistralClient, "gemini": GeminiClient,
     "gpt": OpenAIClient, "claude": ClaudeClient, "kimi": KimiClient,
+    "github": GithubModelsClient,
 }
 
 
@@ -110,11 +112,25 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
         nb_joueurs=len(kinds),
         lang=lang,
     )
-    for cle, attr in (("max_tours", "max_tours"), ("max_centres", "max_centres_par_partie"),
-                      ("points", "points_pour_gagner"), ("max_manches", "max_manches"),
-                      ("seed_cards", "seed_cards"), ("seed_order", "seed_order")):
+    for cle, attr in (
+        ("max_tours", "max_tours"),
+        ("max_centres", "max_centres_par_partie"),
+        ("points", "points_pour_gagner"),
+        ("max_manches", "max_manches"),
+        ("seed_cards", "seed_cards"),
+        ("seed_order", "seed_order"),
+        ("taille_main", "taille_main"),
+        ("taille_centre", "taille_centre"),
+        ("max_sous_tours_par_centre", "max_sous_tours_par_centre"),
+        ("max_tours_negociation", "max_tours_negociation"),
+        ("tours_discussion", "tours_discussion"),
+        ("fenetre_chat", "fenetre_chat"),
+    ):
         if reglages.get(cle) is not None:
             setattr(config, attr, int(reglages[cle]))
+
+    if "evaluer_signaux" in reglages:
+        config.evaluer_signaux = bool(reglages["evaluer_signaux"])
 
     pause = reglages.get("pause")
     agents = {
@@ -122,6 +138,11 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
                        j.get("temperature"), lang)
         for i, j in enumerate(joueurs)
     }
+
+    eval_agent = reglages.get("eval_agent")
+    eval_model = reglages.get("eval_model")
+    if eval_agent:
+        agents["evaluateur"] = build_agent(eval_agent, eval_model, pause, None, lang)
     if publieur is not None:
         publieur.rebrancher(lambda: usage_summary(agents))
 
@@ -190,6 +211,12 @@ def main() -> None:
                          "larger models have much tighter free quotas.")
     ap.add_argument("--pause", type=float, default=None,
                     help="pause (s) between two API calls. Increase on HTTP 429 (e.g. 2)")
+    ap.add_argument("--no-eval", action="store_false", dest="eval",
+                    help="disable LLM signal evaluation at the end of each round (saves API cost)")
+    ap.add_argument("--eval-agent", type=str, default=None,
+                    help="provider for the evaluator: mistral, gemini, gpt, claude, kimi")
+    ap.add_argument("--eval-model", type=str, default=None,
+                    help="specific model for the evaluator")
     args = ap.parse_args()
 
     # sortie UTF-8 pour afficher les symboles de cartes sans planter la console Windows
@@ -222,6 +249,9 @@ def main() -> None:
         "seed_cards": args.seed_cards, "seed_order": args.seed_order,
         "lang": args.lang,
         "joueurs": [{"agent": k, "model": args.model} for k in kinds],
+        "evaluer_signaux": args.eval,
+        "eval_agent": args.eval_agent,
+        "eval_model": args.eval_model,
     }
     try:
         res = jouer_partie(reglages, publieur,

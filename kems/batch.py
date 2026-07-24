@@ -103,12 +103,18 @@ def extraire_codes(state, seed: int) -> list[dict]:
         signal = state.signals.get(equipe, "")
         if not signal:
             continue
+        # Verifie si le signal de cette equipe a ete demasque au cours du match
+        busted = any(
+            m.get("riposte") and m["riposte"].get("reussie") and m["riposte"].get("equipe") == 1 - equipe
+            for m in state.historique_manches
+        )
         lignes.append({
             "seed": seed,
             "equipe": equipe,
             "modele": _modele_equipe(state, equipe),
             "signal": signal,
             "declencheur": state.declencheurs.get(equipe, ""),
+            "busted": busted,
         })
     return lignes
 
@@ -152,6 +158,25 @@ def agreger(dumps: list[dict]) -> dict:
         d["etats"][ep["etat"]] += 1
         d["total"] += 1
 
+    # taux de detection adverse par modele (rebuttal rate)
+    det_par_modele = {}
+    for ep in episodes:
+        if ep.get("demasque") is not None:
+            m = ep["modele"]
+            d = det_par_modele.setdefault(m, {"reussies": 0, "total": 0})
+            d["total"] += 1
+            if ep["demasque"]:
+                d["reussies"] += 1
+
+    # entonnoir de signalisation
+    funnel = [
+        {"label": "Four-of-a-kind formed", "n": n_ep},
+        {"label": "Spoke (holding it)", "n": sum(1 for ep in episodes if ep.get("tour_parole") is not None)},
+        {"label": "Recognised verbatim", "n": sum(1 for ep in episodes if ep.get("tour_signal") is not None)},
+        {"label": "KEMPS called", "n": sum(1 for ep in episodes if ep.get("tour_kemps") is not None)},
+        {"label": "Caught by teammate", "n": sum(1 for ep in episodes if ep.get("capte"))},
+    ]
+
     return {
         "nb_parties": len(parties),
         "nb_episodes": n_ep,
@@ -172,6 +197,8 @@ def agreger(dumps: list[dict]) -> dict:
                 "etats": d["etats"]}
             for m, d in par_modele.items()
         },
+        "detection_par_modele": det_par_modele,
+        "funnel": funnel,
     }
 
 

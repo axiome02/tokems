@@ -7,7 +7,7 @@ avec de vrais appels LLM. Tout ce qui reste est en aval (data, front, contenu).
 
 - **Moteur deterministe** : cartes, etat, vues etanches, regles, resolution des appels, riposte,
   format match. Aucun LLM dedans.
-- **Couche LLM** : clients `MistralClient` / `GeminiClient`, chargeur `.env`, 6 prompts, parsing
+- **Couche LLM** : clients `MistralClient` / `GeminiClient` / `GithubModelsClient` (Inférence gratuite de GPT/Claude), chargeur `.env`, 6 prompts, parsing
   robuste, `LLMAgent`. Aucune regle du jeu dedans.
 - **Observation** : mode `--live`, transcript lisible + `.debug.txt` ultra-detaille (mains, prompts,
   reponses brutes), comptage de tokens, episodes de signalisation.
@@ -205,6 +205,8 @@ les memes precautions dans toute stat publiee.
     Consequence mechante : les adversaires tournent sur le meme modele, donc le « secret » est
     tire d'un dictionnaire que tout le monde possede. Donnee publiable en soi ; levier si on
     veut de la diversite : temperature par joueur via `jouer_partie()`.
+13. **Ajout du client GitHub Models pour l'inférence gratuite (24/07/2026).** Permet d'interroger gratuitement des modèles comme `gpt-4o`, `gpt-4o-mini` et `claude-3-5-sonnet` via un Personal Access Token GitHub (`GITHUB_TOKEN` dans le `.env`), contournant les limites d'accès gratuites habituelles.
+14. **Améliorations UX du Dashboard (24/07/2026).** Initialisation propre (sans résidus des anciennes parties sur le plateau), correction d'un bug bloquant l'indicateur de chargement (`s.en_cours` corrigé en `s.occupe`), et intégration de la phase de négociation en direct pour éviter l'impression de gel de l'interface.
 
 ### Les 4 bugs d'instrumentation corriges (revue 909 -> 1010)
 
@@ -627,7 +629,7 @@ open/
 │   │   ├── client.py          # interface LLMClient.chat(system, user, max_tokens=None)
 │   │   ├── _http.py           # POST + backoff, QuotaError explicite sur 429
 │   │   ├── env.py             # chargeur .env
-│   │   ├── mistral.py / gemini.py / openai.py / anthropic.py / kimi.py  # adaptateurs
+│   │   ├── mistral.py / gemini.py / openai.py / anthropic.py / kimi.py / github.py  # adaptateurs
 │   │   │                        # (model, temperature, pause réglables)
 │   │   ├── prompts.py         # dispatcher lang -> prompts_en / prompts_fr (defaut "en")
 │   │   ├── prompts_en.py / prompts_fr.py  # 6 prompts, 2 langues independantes (pas de fragments partages)
@@ -649,7 +651,7 @@ open/
 
 ## Contexte technique
 
-- Répertoire : `C:\Users\axelp\OneDrive\Bureau\open` (**toujours pas un repo git**).
+- Répertoire : `C:\Users\axelp\OneDrive\Bureau\open` (versionné sous git, commit initial `ad55c09`).
 - Langage : Python 3.11, `requests`. Venv `.venv` → lancer via `.\.venv\Scripts\python.exe`.
 - Déterminisme : `master_seed` dérive deux flux (`cards`, `order`), chacun surchargeable
   séparément via `seed_cards` / `seed_order` (rejouer la même donne avec un autre ordre de jeu).

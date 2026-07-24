@@ -219,9 +219,10 @@ def _texte_recent(state: GameState, limite: int = 8) -> str:
 def _juger_transmission_kemps(state: GameState, agents: dict) -> None:
     """Jugement LLM independant (PURE MESURE, n'affecte jamais le resultat) : le signal de
     l'equipe appelante a-t-il vraiment circule, au-dela de ce que le moteur sait detecter
-    litteralement ? Reutilise le client du joueur 0 comme evaluateur neutre a posteriori —
-    un appel sans etat, qui ne voit que ce qu'on lui donne explicitement ici (aucune fuite
-    d'information vers ses propres decisions de jeu)."""
+    litteralement ?
+    """
+    if not state.config.evaluer_signaux:
+        return
     o = state.outcome
     if not o or o.get("kind") != "KEMPS":
         return
@@ -232,7 +233,9 @@ def _juger_transmission_kemps(state: GameState, agents: dict) -> None:
     if texte:
         # sous filet : une mesure qui echoue (429, reseau) ne tue jamais la partie
         try:
-            o["signal_reellement_emis_llm"] = agents[0].juger_signal(convention, declencheur, texte)
+            evaluateur = agents.get("evaluateur") or agents.get(0)
+            if evaluateur is not None:
+                o["signal_reellement_emis_llm"] = evaluateur.juger_signal(convention, declencheur, texte)
         except Exception:
             pass
 
@@ -292,8 +295,12 @@ def discussion_phase(state: GameState, agents: dict) -> None:
                     # (cf. l'exemple "purple giraffes... dance... at midnight" assemble a deux).
                     # Sous filet : une mesure qui echoue (429, reseau) ne tue JAMAIS la partie.
                     try:
-                        compris = agents[0].juger_signal(
-                            state.signals.get(equipe, ""), declencheur, _texte_recent(state))
+                        evaluateur = agents.get("evaluateur") or agents.get(0)
+                        if evaluateur is not None and state.config.evaluer_signaux:
+                            compris = evaluateur.juger_signal(
+                                state.signals.get(equipe, ""), declencheur, _texte_recent(state))
+                        else:
+                            compris = None
                     except Exception:
                         compris = None
                     rules.marquer_signal_emis(state, pid, litteral, compris)

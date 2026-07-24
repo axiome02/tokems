@@ -134,6 +134,7 @@ class Pilote:
         self.publieur = publieur
         self.thread: threading.Thread | None = None
         self.erreur: str | None = None
+        self.batch_progres: dict | None = None
 
     @property
     def occupe(self) -> bool:
@@ -143,16 +144,79 @@ class Pilote:
         if self.occupe:
             raise RuntimeError("a game is already running")
         self.erreur = None
+        self.batch_progres = None
         self.thread = threading.Thread(target=self._jouer, args=(reglages,), daemon=True)
         self.thread.start()
 
     def _jouer(self, reglages: dict) -> None:
-        # import tardif : `run` importe ce module, on eviterait sinon un import circulaire
         from .run import jouer_partie
         try:
             jouer_partie(reglages, self.publieur)
         except Exception as e:                     # noqa: BLE001 — remonte tel quel a l'UI
             self.erreur = f"{type(e).__name__} : {e}"
+
+    def lancer_batch(self, reglages: dict) -> None:
+        if self.occupe:
+            raise RuntimeError("a game is already running")
+        self.erreur = None
+        n = int(reglages.get("n", 20))
+        self.batch_progres = {"courant": 0, "total": n}
+        self.thread = threading.Thread(target=self._jouer_batch, args=(reglages,), daemon=True)
+        self.thread.start()
+
+    def _jouer_batch(self, reglages: dict) -> None:
+        from .batch import extraire_tout, GAMES_DIR, RESULTS_DIR, regenerer
+        from .run import jouer_partie
+        try:
+            n = int(reglages.get("n", 20))
+            seed_base = int(reglages.get("seed_base", 1000))
+            forcer = bool(reglages.get("forcer", False))
+            
+            reglages_base = {
+                "nb_rangs": int(reglages.get("nb_rangs", 10)),
+                "points": int(reglages.get("points")) if reglages.get("points") is not None else None,
+                "max_manches": int(reglages.get("max_manches")) if reglages.get("max_manches") is not None else None,
+                "max_tours": int(reglages.get("max_tours")) if reglages.get("max_tours") is not None else None,
+                "pause": float(reglages.get("pause")) if reglages.get("pause") is not None else None,
+                "joueurs": reglages.get("joueurs", []),
+                "evaluer_signaux": bool(reglages.get("evaluer_signaux", False)),
+                "eval_agent": reglages.get("eval_agent"),
+                "eval_model": reglages.get("eval_model"),
+            }
+            for k in (
+                "lang", "taille_main", "taille_centre", "max_sous_tours_par_centre",
+                "max_centres_par_partie", "max_tours_negociation", "tours_discussion",
+                "fenetre_chat"
+            ):
+                if k in reglages:
+                    reglages_base[k] = reglages[k]
+            
+            games_dir = os.path.join(RESULTS_DIR, "games")
+            os.makedirs(games_dir, exist_ok=True)
+            
+            for idx, seed in enumerate(range(seed_base, seed_base + n)):
+                self.batch_progres = {"courant": idx, "total": n}
+                cible = os.path.join(games_dir, f"{seed}.json")
+                if os.path.exists(cible) and not forcer:
+                    continue
+                
+                partie_reglages = dict(reglages_base)
+                partie_reglages["seed"] = seed
+                partie_reglages["out"] = os.path.join("transcripts", "batch", f"game_{seed}.txt")
+                
+                res = jouer_partie(partie_reglages)
+                state, usage = res["state"], res["usage"]
+                if state is not None:
+                    dump = extraire_tout(state, usage, seed, interrompu=bool(res.get("interrompu")))
+                    with open(cible, "w", encoding="utf-8") as f:
+                        json.dump(dump, f, ensure_ascii=False, indent=2)
+            
+            self.batch_progres = {"courant": n, "total": n}
+            regenerer(RESULTS_DIR)
+        except Exception as e:
+            self.erreur = f"Batch error: {e}"
+        finally:
+            self.batch_progres = None
 
 
 class _Handler(http.server.SimpleHTTPRequestHandler):
@@ -178,11 +242,71 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/statut"):
             p = self.pilote
-            return self._json(200, {"occupe": bool(p and p.occupe),
-                                    "erreur": p.erreur if p else None})
+            return self._json(200, {
+                "occupe": bool(p and p.occupe),
+                "erreur": p.erreur if p else None,
+                "batch": p.batch_progres if p else None
+            })
+        if self.path.startswith("/api/config"):
+            keys = {
+                "mistral": bool(os.environ.get("MISTRAL_API_KEY")),
+                "gemini": bool(os.environ.get("GEMINI_API_KEY")),
+                "openai": bool(os.environ.get("OPENAI_API_KEY")),
+                "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
+                "kimi": bool(os.environ.get("KIMI_API_KEY")),
+                "github": bool(os.environ.get("GITHUB_TOKEN")),
+            }
+            return self._json(200, {"keys": keys})
+        if self.path.startswith("/api/stats"):
+            import csv
+            summary_path = os.path.join("results", "summary.json")
+            codes_path = os.path.join("results", "codes.csv")
+            parties_path = os.path.join("results", "parties.csv")
+            
+            if os.path.exists(summary_path):
+                try:
+                    with open(summary_path, encoding="utf-8") as f:
+                        data = json.load(f)
+                    
+                    # Charger les codes depuis codes.csv
+                    codes = []
+                    if os.path.exists(codes_path):
+                        with open(codes_path, encoding="utf-8") as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                row["busted"] = row.get("busted") == "True"
+                                codes.append(row)
+                    data["codes_inventes"] = codes
+                    
+                    # Charger les tokens par partie depuis parties.csv
+                    parties = []
+                    if os.path.exists(parties_path):
+                        with open(parties_path, encoding="utf-8") as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                row["tokens_total"] = int(row.get("tokens_total") or 0)
+                                row["seed"] = int(row.get("seed") or 0)
+                                parties.append(row)
+                    data["detail_parties"] = parties
+                    
+                    return self._json(200, data)
+                except Exception as e:
+                    return self._json(500, {"erreur": f"Failed to load stats: {e}"})
+            else:
+                return self._json(404, {"erreur": "No stats found. Run a batch first."})
         return super().do_GET()
 
     def do_POST(self):
+        if self.path.startswith("/api/lancer_batch"):
+            if self.pilote is None:
+                return self._json(503, {"erreur": "controller unavailable"})
+            try:
+                n = int(self.headers.get("Content-Length", 0))
+                reglages = json.loads(self.rfile.read(n) or b"{}")
+                self.pilote.lancer_batch(reglages)
+                return self._json(200, {"ok": True})
+            except Exception as e:
+                return self._json(400, {"erreur": str(e)})
         if not self.path.startswith("/api/lancer"):
             return self._json(404, {"erreur": "unknown route"})
         if self.pilote is None:

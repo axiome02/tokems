@@ -4,6 +4,7 @@ from kems.llm.anthropic import ClaudeClient
 from kems.llm.client import LLMClient
 from kems.llm.env import load_env
 from kems.llm.gemini import GeminiClient
+from kems.llm.github import GithubModelsClient
 from kems.llm.kimi import KimiClient
 from kems.llm.mistral import MistralClient
 from kems.llm.openai import OpenAIClient
@@ -29,9 +30,10 @@ def test_clients_sont_des_llmclient():
     o = OpenAIClient(api_key="fake")
     c = ClaudeClient(api_key="fake")
     k = KimiClient(api_key="fake")
-    for client in (m, g, o, c, k):
+    gh = GithubModelsClient(api_key="fake")
+    for client in (m, g, o, c, k, gh):
         assert isinstance(client, LLMClient)
-    assert (m.nom, g.nom, o.nom, c.nom, k.nom) == ("mistral", "gemini", "gpt", "claude", "kimi")
+    assert (m.nom, g.nom, o.nom, c.nom, k.nom, gh.nom) == ("mistral", "gemini", "gpt", "claude", "kimi", "github")
 
 
 def test_client_sans_cle_leve(monkeypatch):
@@ -48,6 +50,7 @@ def test_nouveaux_clients_sans_cle_levent(monkeypatch):
         ("OPENAI_API_KEY", OpenAIClient),
         ("ANTHROPIC_API_KEY", ClaudeClient),
         ("KIMI_API_KEY", KimiClient),
+        ("GITHUB_TOKEN", GithubModelsClient),
     ):
         monkeypatch.delenv(env_key, raising=False)
         try:

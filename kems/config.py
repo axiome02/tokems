@@ -34,5 +34,9 @@ class Config:
 
     # langue de la partie : prompts LLM + evenements publics + transcript. "en" ou "fr".
     # Defaut "en" (norme des benchmarks publics) ; aucun recalibrage n'a ete fait pour "fr"
-    # depuis l'introduction du multilingue (voir CLAUDE.md, historique des reglages francais).
+    # depuis l'introduction du multilingue (22/07/2026) : les mesures de reference restent en francais.
     lang: str = "en"
+
+    # Optionnel : Evaluation semantique de la transmission du signal via LLM
+    evaluer_signaux: bool = True      # si True, appelle un juge LLM pour evaluer la transmission
+    modele_evaluateur: str | None = None  # specifie le modele/fournisseur du juge (ex: "gpt-4o")
