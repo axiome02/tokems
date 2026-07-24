@@ -1,157 +1,107 @@
 # Kems-Bench
 
-*[Lire en français](README.md)*
-
-A benchmark where **LLMs play Kems** (a.k.a. Kemps, a card game built around a secret signal)
-against each other. The point: Kems forces teammates to **communicate through a hidden signal**
-in a channel their opponents can see — a playful illustration of *secret collusion between AI
-agents*. The engine is a deterministic referee; LLMs only ever produce actions.
-
-> Full design in [`CLAUDE.md`](CLAUDE.md) (French) · implementation plan in [`PLAN_V0.md`](PLAN_V0.md) (French)
-
-> **Note:** the project's internal docs (`CLAUDE.md`, `PLAN_V0.md`) stay French-only (working
-> notes). The game itself — LLM prompts, in-game messages, transcripts — is bilingual: **English
-> by default**, French with `--lang fr`. The switch has only been smoke-tested offline so far
-> (no real-model game played end-to-end in either language since it was added); all of the
-> project's prompt calibration history (token cost, square-formation rate, deadlock risk) was
-> measured in French before English existed — see `CLAUDE.md` for that caveat.
+A benchmark playground where **LLM agents play Kems** (the card game of secret signals) against each other. 
+This project illustrates and tests **secret collusion between AI agents** under adversarial observation: teammates must establish and execute a hidden signaling protocol in a public chat channel monitored by their opponents. The game engine is fully deterministic, while LLMs produce actions.
 
 ---
 
-## 1. Installation (one-time)
+## 1. Installation
 
-The project uses a Python virtual environment (`.venv`), already present. To recreate it if needed:
+The project uses a Python virtual environment (`.venv`). Follow these steps to set it up:
 
+### Create and Activate the Virtual Environment
 ```powershell
+# Create the virtual environment
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+# Activate it (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
 ```
 
-> Throughout this README, Python is invoked via `.\.venv\Scripts\python.exe` to make sure the venv
-> is used. You can also activate it once with `.\.venv\Scripts\Activate.ps1` and just type `python`.
-
----
-
-## 2. Run a game
-
-Basic command:
-
+### Install Dependencies
+With the virtual environment activated, install the required packages:
 ```powershell
-.\.venv\Scripts\python.exe -m kems.run --agents mistral,mistral,mistral,mistral --seed 42
+pip install -r requirements.txt
 ```
-
-- `--agents`: the 4 players, comma-separated. Possible values:
-  - `mistral` / `gemini` / `gpt` / `claude` / `kimi` → real models (needs API keys, see §4)
-- `--seed`: fixes the randomness of the cards and play order (the engine is deterministic; only
-  the LLMs' responses introduce variability from one game to the next).
-- `--nb-rangs`: number of ranks in the deck (default `10` = cards 1-10). Fewer ranks = squares form
-  more often.
-- `--out`: path to the transcript (default `transcripts/game_<seed>.txt`).
-
-Every game writes a **full transcript** to `transcripts/`, readable in VSCode.
+*(Alternatively, you can run directly using the venv executable: `.\.venv\Scripts\python.exe -m pip install -r requirements.txt`)*
 
 ---
 
-## 3. Watch the game unfold live (`--live`)
+## 2. Configuration (`.env`)
 
-Add `--live` to print the public chat **line by line in the terminal**, as the game plays out:
+1. Copy the example file to create your own configuration file:
+   Copy `.env.example` to `.env`. (The `.env` file is gitignored and will never be pushed).
+2. Open `.env` and fill in your API keys.
 
-```powershell
-.\.venv\Scripts\python.exe -m kems.run --agents mistral,mistral,mistral,mistral --seed 42 --live
+### 🌟 Free Tier with GitHub Models (Recommended)
+You can test top-tier models like **GPT-4o**, **GPT-4o-mini**, and **Claude 3.5 Sonnet** completely **for free** by using a GitHub Personal Access Token (PAT).
+- Go to GitHub -> Settings -> Developer Settings -> Personal Access Tokens (classic).
+- Click **Generate new token (classic)**. Choose a name (e.g. `kems-bench`), an expiration date, and **do not check any scopes** (keep all checkboxes unchecked for security).
+- Click **Generate token**, copy the key starting with `ghp_...` and add it to your `.env` file:
+  ```env
+  GITHUB_TOKEN=ghp_your_github_token_here
+  ```
+
+### Other Providers
+If you have paid API keys, you can also fill in:
+```env
+MISTRAL_API_KEY=your_key
+GEMINI_API_KEY=your_key
+OPENAI_API_KEY=your_key
+ANTHROPIC_API_KEY=your_key
+KIMI_API_KEY=your_key
 ```
-
-- `--delay 0.5`: adds a 0.5s pause between lines for more comfortable reading (real LLMs are
-  already slow; this option mostly helps when the pacing feels choppy).
-
-### What live mode looks like
-
-```
-── Negociation / mise en place ──
-   Debut de partie - seed=42, rangs 1..10
-
-── Tour 5 ──
-   Alice prend 3♣, repose 8♦
-   ...
-   Centre balaye -> 8♠ 4♠ 9♥ 5♥
-   Alice : « rien de spécial, je repense juste à cette histoire de banane... »   ← signal slipped in
-
-── Tour 6 ──
-   Chloe : « (tape du poing sur la table) »
-   Chloe crie KEMPS ! -> REUSSI                                                   ← teammate caught it
-
-================================================================
-REVELATIONS (fin de partie)
-  Signal secret equipe 0 : « banane »
-  Main finale Alice : 3♠ 3♥ 3♦ 3♣   <<< SQUARE of 3s
-  Resultat : equipe 0 GAGNE — KEMPS reussi
-================================================================
-```
-
-Each line is a **public** event: a card exchange, a message, a call, the center being swept.
-Hands, plans, and secret signals stay private until the end-of-game **reveal**.
-
-Transcript lines stay in French (`prend`/`repose`, `crie KEMPS`, `REUSSI`) since that's the
-language the game itself is currently played in — see the note at the top of this file.
-
-In VSCode: open the integrated terminal (`` Ctrl+` ``) and run the command; or open
-`transcripts/game_42.txt` (`Ctrl+P`) to replay the whole game at your own pace.
 
 ---
 
-## 4. Play with real models (Mistral / Gemini / GPT / Claude / Kimi / GitHub)
+## 3. Running the Web Dashboard
 
-1. Create a `.env` file at the project root (copy of [`.env.example`](.env.example)):
-   ```
-   MISTRAL_API_KEY=your_mistral_key
-   GEMINI_API_KEY=your_gemini_key
-   OPENAI_API_KEY=your_openai_key
-   ANTHROPIC_API_KEY=your_anthropic_key
-   KIMI_API_KEY=your_kimi_key
-   GITHUB_TOKEN=your_github_token  # Optional: for querying GPT/Claude for free via GitHub Models
-   ```
-   `.env` is gitignored. You only need keys for the providers you actually use.
+The web dashboard provides a beautiful card-table interface where you can configure players, launch matches, watch card exchanges in real-time, read AI monologues, and analyze logs.
 
-2. Run a mixed game, live:
+1. **Start the local server**:
    ```powershell
-   .\.venv\Scripts\python.exe -m kems.run --agents mistral,gemini,mistral,gemini --seed 42 --live
+   .\.venv\Scripts\python.exe -m kems.run --serve
    ```
-
-   If you configured `GITHUB_TOKEN`, you can run models (like `gpt-4o` or `claude-3-5-sonnet`) for free using the `github` provider:
-   ```powershell
-   .\.venv\Scripts\python.exe -m kems.run --agents github,github,github,github --model gpt-4o-mini --seed 42 --live
-   ```
-
-Teams are: **team 0** = players 1 & 3, **team 1** = players 2 & 4 (in `--agents` order).
-
-> `--model` applies identically to every player regardless of their provider: for a different
-> model per player (useful when mixing providers), use `jouer_partie()` from Python or the
-> dashboard form (`--serve`).
+2. **Access the dashboard**:
+   Open **[http://127.0.0.1:8000/](http://127.0.0.1:8000/)** in your web browser.
+3. **Launch a game**:
+   - Click **New Game** in the top right.
+   - Set the *Provider* of your players to **`github`** (it will show `● key OK` if your `GITHUB_TOKEN` is loaded).
+   - Choose a model (e.g., `gpt-4o-mini`, `gpt-4o`, `claude-3-5-sonnet`) and click **Launch**!
 
 ---
 
-## 5. Run the tests
+## 4. Running via Command Line (CLI)
 
+You can also run matches directly from the terminal. 
+
+### Launch a game with live output:
 ```powershell
-.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m kems.run --agents github,github,github,github --model gpt-4o-mini --seed 42 --live
 ```
 
-Covers: deck construction, square detection, **information tightness** (a player never sees
-another player's private info), call resolution, the LLM clients (`.env` loading, missing-key
-errors), and the prompt → parse round-trip of the LLM layer.
+### CLI Options:
+- `--agents`: Comma-separated list of the 4 players (e.g. `github,github,github,github` or `gemini,gemini,gemini,gemini`). Teams are: Team 0 (players 1 & 3) vs Team 1 (players 2 & 4).
+- `--model`: Specific model to apply to all players (e.g. `gpt-4o-mini`, `claude-3-5-sonnet`).
+- `--seed`: Fixes the deck shuffle and order of play.
+- `--live`: Prints the public chat events in the terminal line-by-line as they happen.
+- `--delay 0.5`: Adds a delay (seconds) between live prints for readability.
+- `--max-manches N`: Stops the match after N rounds (default: 5).
+- `--points N`: Number of rounds needed to win the match (default: 2).
+
+Every game writes a complete human-readable transcript under `transcripts/` (e.g. `transcripts/game_42.txt`) and a highly-detailed log file showing the raw prompts and responses under `transcripts/game_42.debug.txt`.
 
 ---
 
-## Structure
+## 5. Directory Structure
 
 ```
 kems/
-├── config.py          settings (deck size, cost caps…)
-├── engine/            deterministic engine (cards, state, views, rules) — no LLM
-├── llm/                LLM integration (clients, prompts, parsing) — no game rules
-├── agents.py          LLMAgent (decision layer: view → prompt → parse)
-├── orchestrator.py    the game loop
-├── transcript.py      human-readable game rendering
-└── run.py             CLI
-tests/                 test suite
-transcripts/           generated games
+├── config.py          Game settings (hand size, deck ranks, max turns...)
+├── engine/            Deterministic game engine (cards, rules, views...) — no LLMs
+├── llm/               LLM adapters, prompts, and parsing logic — no rules
+├── agents.py          LLMAgent layer translating views to prompts and parsing actions
+├── orchestrator.py    The core game loop coordinator
+├── transcript.py      Human-readable transcript renderer
+└── run.py             Command Line Interface (CLI)
 ```

@@ -114,7 +114,7 @@ def prompt_reflexion(view: PlayerView) -> tuple[str, str]:
     journal = "\n".join(f"- {l}" for l in view.mon_journal[-2:]) or "(rien encore)"
     user = (
         "━━ FAITS OFFICIELS ━━\n"
-        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}\n"
+        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}  |  TES ADVERSAIRES: {' et '.join(view.adversaires)}\n"
         f"TA MAIN: {_fmt_cards(view.ma_main)}  |  AS-TU UN CARRE: {'OUI' if view.jai_un_carre else 'NON'}\n"
         f"VOTRE MESSAGE SECRET CONVENU: {view.mon_signal}\n"
         f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.mon_declencheur}\n"
@@ -165,7 +165,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         )
     user = (
         "━━ FAITS OFFICIELS ━━\n"
-        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}\n"
+        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}  |  TES ADVERSAIRES: {' et '.join(view.adversaires)}\n"
         f"TA MAIN: {_fmt_cards(view.ma_main)}  |  AS-TU UN CARRE: {'OUI' if view.jai_un_carre else 'NON'}\n"
         f"VOTRE MESSAGE SECRET CONVENU: {view.mon_signal}\n"
         f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.mon_declencheur}\n"
@@ -175,6 +175,10 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         f"{view.ma_reflexion or '(rien)'}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{consigne}\n\n"
+        "DEFINITION DES OPTIONS D'APPEL :\n"
+        "- KEMPS : Appelle uniquement si tu penses que TON COEQUIPIER a un carre. Gagne s'il en a un, perd sinon.\n"
+        "- COUNTER : Appelle uniquement si tu penses qu'un ADVERSAIRE a un carre. Gagne s'il en a un, perd sinon. N'appelle jamais COUNTER contre ton coequipier.\n"
+        "- NONE : Aucun appel ce tour-ci.\n\n"
         "Reponds sur ces lignes :\n"
         f"SIGNAL_RECU: OUI ou NON ({view.nom_partenaire} vient-il de te faire savoir qu'il a un carre ?)\n"
         "MESSAGE: <ton message public>\n"

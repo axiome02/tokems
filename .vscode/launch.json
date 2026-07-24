@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Kems Dashboard (Server)",
+      "type": "python",
+      "request": "launch",
+      "module": "kems.run",
+      "args": [
+        "--serve"
+      ],
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Kems Game (Live terminal demo)",
+      "type": "python",
+      "request": "launch",
+      "module": "kems.run",
+      "args": [
+        "--agents", "mistral,mistral,mistral,mistral",
+        "--seed", "42",
+        "--live"
+      ],
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "console": "integratedTerminal"
+    }
+  ]
+}

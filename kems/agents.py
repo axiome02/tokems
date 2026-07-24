@@ -39,18 +39,26 @@ class LLMAgent(Agent):
         self.lang = lang
         self.last_io: tuple[str, str, str] | None = None  # (system, user, raw)
 
-    def _ask(self, prompt: tuple[str, str], max_tokens: int | None = None) -> str:
+    def _ask(self, prompt: tuple[str, str], max_tokens: int | None = None, pid: int | None = None) -> str:
         """Envoie (system, user) au client, memorise l'echange pour la trace, renvoie le brut."""
         system, user = prompt
-        raw = self.client.chat(system, user, max_tokens=max_tokens)
-        self.last_io = (system, user, raw)
-        return raw
+        from .llm import _http
+        old_pid = getattr(_http.api_tracker, "current_pid", None)
+        if pid is not None:
+            _http.api_tracker.current_pid = pid
+        try:
+            raw = self.client.chat(system, user, max_tokens=max_tokens)
+            self.last_io = (system, user, raw)
+            return raw
+        finally:
+            if pid is not None:
+                _http.api_tracker.current_pid = old_pid
 
     def negotiate(self, view: PlayerView) -> Nego:
-        return parse.parse_negociation(self._ask(prompts.prompt_negociation(view, self.lang)))
+        return parse.parse_negociation(self._ask(prompts.prompt_negociation(view, self.lang), pid=view.pid))
 
     def decide_card(self, view: PlayerView):
-        return parse.parse_carte(self._ask(prompts.prompt_micro_carte(view, self.lang)), view)
+        return parse.parse_carte(self._ask(prompts.prompt_micro_carte(view, self.lang), pid=view.pid), view)
 
     # poste de cout n°1 (145k tokens en partie 404 avec un monologue long) ; releve a 500
     # sur demande explicite (2026-07-23), acceptant le surcout pour plus de marge de raisonnement
@@ -59,13 +67,13 @@ class LLMAgent(Agent):
     def reflechir(self, view: PlayerView) -> str:
         """Monologue interieur : on garde le texte brut, il n'y a rien a parser."""
         return self._ask(prompts.prompt_reflexion(view, self.lang),
-                          max_tokens=self.MAX_TOKENS_REFLEXION).strip()
+                          max_tokens=self.MAX_TOKENS_REFLEXION, pid=view.pid).strip()
 
     def decide_discussion(self, view: PlayerView) -> tuple[str, Call, str]:
-        return parse.parse_discussion(self._ask(prompts.prompt_discussion(view, self.lang)), view)
+        return parse.parse_discussion(self._ask(prompts.prompt_discussion(view, self.lang), pid=view.pid), view)
 
     def deviner_signal(self, view: PlayerView) -> Guess:
-        return parse.parse_riposte(self._ask(prompts.prompt_riposte(view, self.lang)))
+        return parse.parse_riposte(self._ask(prompts.prompt_riposte(view, self.lang), pid=view.pid))
 
     def juger_signal(self, convention: str, declencheur: str, texte: str) -> bool:
         """Jugement de mesure (pure mesure, sans effet sur la partie) : le signal a-t-il ete

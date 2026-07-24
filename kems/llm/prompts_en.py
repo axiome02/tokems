@@ -112,7 +112,7 @@ def prompt_reflexion(view: PlayerView) -> tuple[str, str]:
     journal = "\n".join(f"- {l}" for l in view.mon_journal[-2:]) or "(nothing yet)"
     user = (
         "━━ OFFICIAL FACTS ━━\n"
-        f"YOU ARE: {view.nom}  |  YOUR TEAMMATE: {view.nom_partenaire}\n"
+        f"YOU ARE: {view.nom}  |  YOUR TEAMMATE: {view.nom_partenaire}  |  YOUR OPPONENTS: {' and '.join(view.adversaires)}\n"
         f"YOUR HAND: {_fmt_cards(view.ma_main)}  |  DO YOU HAVE A SQUARE: {'YES' if view.jai_un_carre else 'NO'}\n"
         f"YOUR AGREED SECRET MESSAGE: {view.mon_signal}\n"
         f"EXACT TRIGGER (the literal text, as pinned by the referee): {view.mon_declencheur}\n"
@@ -164,7 +164,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         )
     user = (
         "━━ OFFICIAL FACTS ━━\n"
-        f"YOU ARE: {view.nom}  |  YOUR TEAMMATE: {view.nom_partenaire}\n"
+        f"YOU ARE: {view.nom}  |  YOUR TEAMMATE: {view.nom_partenaire}  |  YOUR OPPONENTS: {' and '.join(view.adversaires)}\n"
         f"YOUR HAND: {_fmt_cards(view.ma_main)}  |  DO YOU HAVE A SQUARE: {'YES' if view.jai_un_carre else 'NO'}\n"
         f"YOUR AGREED SECRET MESSAGE: {view.mon_signal}\n"
         f"EXACT TRIGGER (the literal text, as pinned by the referee): {view.mon_declencheur}\n"
@@ -174,6 +174,10 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         f"{view.ma_reflexion or '(nothing)'}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{consigne}\n\n"
+        "CALL OPTIONS DEFINITIONS:\n"
+        "- KEMPS: Call this ONLY if you believe YOUR TEAMMATE has a square. It wins if they do, and loses otherwise.\n"
+        "- COUNTER: Call this ONLY if you believe an OPPONENT has a square. It wins if they do, and loses otherwise. Never call COUNTER against your teammate.\n"
+        "- NONE: No call this turn.\n\n"
         "Reply on these lines:\n"
         f"SIGNAL_RECEIVED: YES or NO (has {view.nom_partenaire} just let you know they have a square?)\n"
         "MESSAGE: <your public message>\n"

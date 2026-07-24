@@ -73,6 +73,8 @@ class Capteur:
 
     def __call__(self, ev, state):
         self.state = state
+        from .llm import _http
+        _http.api_tracker.state = state
         for o in self._obs:
             o(ev, state)
 
@@ -145,6 +147,11 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
         agents["evaluateur"] = build_agent(eval_agent, eval_model, pause, None, lang)
     if publieur is not None:
         publieur.rebrancher(lambda: usage_summary(agents))
+
+    from .llm import _http
+    _http.api_tracker.publieur = publieur
+    _http.api_tracker.state = None
+    _http.api_tracker.current_pid = None
 
     capteur = Capteur(*[o for o in (printer, publieur) if o])
     interrompu = None
