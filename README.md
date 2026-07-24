@@ -1,65 +1,69 @@
 # Kems-Bench
 
-*[Read this in English](README.en.md)*
+*[Lire en français](README.md)*
 
-Un benchmark où des **LLM jouent au Kems** (jeu de cartes à signal secret) les uns contre les
-autres. L'intérêt : le Kems oblige les coéquipiers à **communiquer par un signal caché** dans un
-canal observé par les adversaires — c'est une illustration ludique de la *collusion secrète entre
-agents IA*. Le moteur est un arbitre déterministe ; les LLM ne font que produire des actions.
+A benchmark where **LLMs play Kems** (a.k.a. Kemps, a card game built around a secret signal)
+against each other. The point: Kems forces teammates to **communicate through a hidden signal**
+in a channel their opponents can see — a playful illustration of *secret collusion between AI
+agents*. The engine is a deterministic referee; LLMs only ever produce actions.
 
-> Conception détaillée dans [`CLAUDE.md`](CLAUDE.md) · plan d'implémentation dans [`PLAN_V0.md`](PLAN_V0.md)
+> Full design in [`CLAUDE.md`](CLAUDE.md) (French) · implementation plan in [`PLAN_V0.md`](PLAN_V0.md) (French)
+
+> **Note:** the project's internal docs (`CLAUDE.md`, `PLAN_V0.md`) stay French-only (working
+> notes). The game itself — LLM prompts, in-game messages, transcripts — is bilingual: **English
+> by default**, French with `--lang fr`. The switch has only been smoke-tested offline so far
+> (no real-model game played end-to-end in either language since it was added); all of the
+> project's prompt calibration history (token cost, square-formation rate, deadlock risk) was
+> measured in French before English existed — see `CLAUDE.md` for that caveat.
 
 ---
 
-## 1. Installation (une fois)
+## 1. Installation (one-time)
 
-Le projet utilise un environnement virtuel Python (`.venv`), déjà présent. S'il faut le recréer :
+The project uses a Python virtual environment (`.venv`), already present. To recreate it if needed:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 ```
 
-> Dans ce README, on appelle Python via `.\.venv\Scripts\python.exe` pour être sûr d'utiliser le
-> venv. Tu peux aussi l'activer une fois avec `.\.venv\Scripts\Activate.ps1` puis taper juste `python`.
+> Throughout this README, Python is invoked via `.\.venv\Scripts\python.exe` to make sure the venv
+> is used. You can also activate it once with `.\.venv\Scripts\Activate.ps1` and just type `python`.
 
 ---
 
-## 2. Lancer une partie
+## 2. Run a game
 
-La commande de base :
+Basic command:
 
 ```powershell
 .\.venv\Scripts\python.exe -m kems.run --agents mistral,mistral,mistral,mistral --seed 42
 ```
 
-- `--agents` : les 4 joueurs, séparés par des virgules. Valeurs possibles :
-  - `mistral` / `gemini` / `gpt` / `claude` / `kimi` → vrais modèles (nécessite les clés API, voir §4)
-- `--lang` : langue de la partie (prompts LLM + messages en jeu + transcript). `en` (défaut) ou
-  `fr`. Aucune mesure de référence n'a encore été refaite en `fr` depuis l'introduction du
-  multilingue — voir `CLAUDE.md`.
-- `--seed` : fixe l'aléa des cartes et de l'ordre de jeu (le moteur est déterministe ; seules
-  les réponses des LLM introduisent de la variabilité d'une partie à l'autre).
-- `--nb-rangs` : nombre de rangs du paquet (défaut `10` = cartes 1-10). Moins de rangs = carrés plus fréquents.
-- `--out` : chemin du transcript (défaut `transcripts/game_<seed>.txt`).
+- `--agents`: the 4 players, comma-separated. Possible values:
+  - `mistral` / `gemini` / `gpt` / `claude` / `kimi` → real models (needs API keys, see §4)
+- `--seed`: fixes the randomness of the cards and play order (the engine is deterministic; only
+  the LLMs' responses introduce variability from one game to the next).
+- `--nb-rangs`: number of ranks in the deck (default `10` = cards 1-10). Fewer ranks = squares form
+  more often.
+- `--out`: path to the transcript (default `transcripts/game_<seed>.txt`).
 
-Chaque partie écrit un **transcript complet** dans `transcripts/`, lisible dans VSCode.
+Every game writes a **full transcript** to `transcripts/`, readable in VSCode.
 
 ---
 
-## 3. Voir la partie défiler en direct (`--live`)
+## 3. Watch the game unfold live (`--live`)
 
-Ajoute `--live` pour afficher le chat global **ligne par ligne dans le terminal**, au fur et à
-mesure du jeu :
+Add `--live` to print the public chat **line by line in the terminal**, as the game plays out:
 
 ```powershell
 .\.venv\Scripts\python.exe -m kems.run --agents mistral,mistral,mistral,mistral --seed 42 --live
 ```
 
-- `--delay 0.5` : ajoute une pause de 0,5 s entre chaque ligne pour lire plus confortablement
-  (les vrais LLM sont déjà lents ; l'option est surtout utile si le débit paraît haché).
+- `--delay 0.5`: adds a 0.5s pause between lines for more comfortable reading (real LLMs are
+  already slow; this option mostly helps when the pacing feels choppy).
 
-### À quoi ressemble le mode live
+### What live mode looks like
 
 ```
 ── Negociation / mise en place ──
@@ -69,68 +73,71 @@ mesure du jeu :
    Alice prend 3♣, repose 8♦
    ...
    Centre balaye -> 8♠ 4♠ 9♥ 5♥
-   Alice : « rien de spécial, je repense juste à cette histoire de banane... »   ← signal glissé
+   Alice : « rien de spécial, je repense juste à cette histoire de banane... »   ← signal slipped in
 
 ── Tour 6 ──
    Chloe : « (tape du poing sur la table) »
-   Chloe crie KEMPS ! -> REUSSI                                                   ← le partenaire a capté
+   Chloe crie KEMPS ! -> REUSSI                                                   ← teammate caught it
 
 ================================================================
 REVELATIONS (fin de partie)
   Signal secret equipe 0 : « banane »
-  Main finale Alice : 3♠ 3♥ 3♦ 3♣   <<< CARRE de 3
+  Main finale Alice : 3♠ 3♥ 3♦ 3♣   <<< SQUARE of 3s
   Resultat : equipe 0 GAGNE — KEMPS reussi
 ================================================================
 ```
 
-Chaque ligne est un événement **public** : échange de carte, message, appel, balayage du centre.
-Les mains, plans et signaux restent privés jusqu'aux **révélations** de fin de partie.
+Each line is a **public** event: a card exchange, a message, a call, the center being swept.
+Hands, plans, and secret signals stay private until the end-of-game **reveal**.
 
-Dans VSCode : ouvre le terminal intégré (`` Ctrl+` ``) et lance la commande ; ou ouvre le fichier
-`transcripts/game_42.txt` (`Ctrl+P`) pour relire toute la partie à ton rythme.
+Transcript lines stay in French (`prend`/`repose`, `crie KEMPS`, `REUSSI`) since that's the
+language the game itself is currently played in — see the note at the top of this file.
+
+In VSCode: open the integrated terminal (`` Ctrl+` ``) and run the command; or open
+`transcripts/game_42.txt` (`Ctrl+P`) to replay the whole game at your own pace.
 
 ---
 
-## 4. Jouer avec de vrais modèles (Mistral / Gemini / GPT / Claude / Kimi / GitHub)
+## 4. Play with real models (Mistral / Gemini / GPT / Claude / Kimi / GitHub)
 
-1. Crée un fichier `.env` à la racine (copie de [`.env.example`](.env.example)) :
+1. Create a `.env` file at the project root (copy of [`.env.example`](.env.example)):
    ```
-   MISTRAL_API_KEY=ta_cle_mistral
-   GEMINI_API_KEY=ta_cle_gemini
-   OPENAI_API_KEY=ta_cle_openai
-   ANTHROPIC_API_KEY=ta_cle_anthropic
-   KIMI_API_KEY=ta_cle_kimi
-   GITHUB_TOKEN=ta_cle_github  # Optionnel : pour interroger gratuitement GPT/Claude via GitHub Models
+   MISTRAL_API_KEY=your_mistral_key
+   GEMINI_API_KEY=your_gemini_key
+   OPENAI_API_KEY=your_openai_key
+   ANTHROPIC_API_KEY=your_anthropic_key
+   KIMI_API_KEY=your_kimi_key
+   GITHUB_TOKEN=your_github_token  # Optional: for querying GPT/Claude for free via GitHub Models
    ```
-   Le `.env` est ignoré par git. Seules les clés des fournisseurs que tu utilises sont nécessaires.
+   `.env` is gitignored. You only need keys for the providers you actually use.
 
-2. Lance une partie mixte, en direct :
+2. Run a mixed game, live:
    ```powershell
    .\.venv\Scripts\python.exe -m kems.run --agents mistral,gemini,mistral,gemini --seed 42 --live
    ```
 
-   Si tu as configuré `GITHUB_TOKEN`, tu peux faire s'affronter des modèles gratuitement (comme `gpt-4o` ou `claude-3-5-sonnet`) en utilisant le fournisseur `github` :
+   If you configured `GITHUB_TOKEN`, you can run models (like `gpt-4o` or `claude-3-5-sonnet`) for free using the `github` provider:
    ```powershell
    .\.venv\Scripts\python.exe -m kems.run --agents github,github,github,github --model gpt-4o-mini --seed 42 --live
    ```
 
-Les équipes sont : **équipe 0** = joueurs 1 & 3, **équipe 1** = joueurs 2 & 4 (dans l'ordre `--agents`).
+Teams are: **team 0** = players 1 & 3, **team 1** = players 2 & 4 (in `--agents` order).
 
-> `--model` s'applique identiquement à tous les joueurs quel que soit leur fournisseur : pour un
-> modèle différent par joueur (utile en mix multi-fournisseurs), passer par `jouer_partie()` en
-> Python ou par le formulaire du dashboard (`--serve`).
+> `--model` applies identically to every player regardless of their provider: for a different
+> model per player (useful when mixing providers), use `jouer_partie()` from Python or the
+> dashboard form (`--serve`).
 
 ---
 
-## 5. Lancer les tests
+## 5. Run the tests
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Couvre : construction du paquet, détection des carrés, **étanchéité de l'information** (un joueur ne
-voit jamais l'info privée d'autrui), résolution des appels, les clients LLM (chargement `.env`,
-absence de clé), et le round-trip prompts → parse de la couche LLM.
+Covers: deck construction, square detection, **information tightness** (a player never sees
+another player's private info), call resolution, the LLM clients (`.env` loading, missing-key
+errors), and the prompt → parse round-trip of the LLM layer.
 
 ---
 
@@ -138,13 +145,13 @@ absence de clé), et le round-trip prompts → parse de la couche LLM.
 
 ```
 kems/
-├── config.py          réglages (nb de rangs, bornes de coût…)
-├── engine/            moteur déterministe (cartes, état, vues, règles) — aucun LLM
-├── llm/               intégration LLM (clients, prompts, parsing) — aucune règle
-├── agents.py          LLMAgent (couche de décision : vue → prompt → parse)
-├── orchestrator.py    la boucle de jeu
-├── transcript.py      rendu lisible de la partie
+├── config.py          settings (deck size, cost caps…)
+├── engine/            deterministic engine (cards, state, views, rules) — no LLM
+├── llm/                LLM integration (clients, prompts, parsing) — no game rules
+├── agents.py          LLMAgent (decision layer: view → prompt → parse)
+├── orchestrator.py    the game loop
+├── transcript.py      human-readable game rendering
 └── run.py             CLI
-tests/                 suite de tests
-transcripts/           parties générées
+tests/                 test suite
+transcripts/           generated games
 ```
