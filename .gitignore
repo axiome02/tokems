@@ -16,5 +16,5 @@ CLAUDE.md
 PLAN_V0.md
 tests/
 conftest.py
-requirements-dev.txt 
-pyproject.toml)
+pyproject.toml
+requirements-dev.txt
