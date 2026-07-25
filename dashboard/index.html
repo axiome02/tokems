@@ -764,7 +764,9 @@
   <div class="stat"><span class="eyebrow">Round</span><b id="s-manche">—</b></div>
   <div class="stat"><span class="eyebrow">Turn</span><b id="s-tour">—</b></div>
   <div class="stat"><span class="eyebrow">Score</span><b id="s-score">—</b></div>
-  <div class="stat"><span class="eyebrow">Tokens</span><b id="s-tok">—</b></div>
+  <div class="stat"><span class="eyebrow">Tokens Input</span><b id="s-tok-in">—</b></div>
+  <div class="stat"><span class="eyebrow">Tokens Cached</span><b id="s-tok-cache">—</b></div>
+  <div class="stat"><span class="eyebrow">Tokens Output</span><b id="s-tok-out">—</b></div>
   <div class="legende">
     <span class="puce t0"></span> Team A
     <span class="puce t1"></span> Team B
@@ -813,7 +815,7 @@
         <div class="body"><div class="flux" id="chat"><p class="vide">Nothing yet.</p></div></div>
       </div>
       <div class="panel" id="pan-nego">
-        <header><h2>Signal negotiation</h2><span class="eyebrow">before the game, per team</span></header>
+        <header><h2>Signal negotiation &amp; debriefing</h2><span class="eyebrow">before the game / between rounds, per team</span></header>
         <div class="body"><div class="flux" id="negociation"><p class="vide">Nothing yet.</p></div></div>
       </div>
       <div class="panel" id="pan-refl">
@@ -956,7 +958,7 @@
       <div class="rangee" style="margin-top: 0.5rem; gap: 0.8rem;">
         <label class="champ"><span class="eyebrow">Evaluator Agent</span>
           <select id="f-eval-agent">
-            <option value="">None (Player 0)</option>
+            <option value="">None (Disabled)</option>
             <option value="mistral">mistral</option>
             <option value="gemini">gemini</option>
             <option value="gpt">gpt</option>
@@ -1033,12 +1035,13 @@
       <div class="rangee" style="margin-top: 0.5rem; gap: 0.8rem;">
         <label class="champ"><span class="eyebrow">Evaluator Agent</span>
           <select id="fb-eval-agent">
-            <option value="">None (Player 0)</option>
+            <option value="">None (Disabled)</option>
             <option value="mistral">mistral</option>
             <option value="gemini">gemini</option>
             <option value="gpt">gpt</option>
             <option value="claude">claude</option>
             <option value="kimi">kimi</option>
+            <option value="github">github</option>
           </select></label>
         <label class="champ"><span class="eyebrow">Evaluator Model</span>
           <input type="text" id="fb-eval-model" placeholder="Default model" style="width:10rem"></label>
@@ -1289,14 +1292,15 @@ function rendreFlux(etapes, navigue) {
          + puce + `<span>${esc(e.texte)}</span></div>`;
   }).join("") : '<p class="vide">Nothing yet.</p>', `c${chat.length}:${idx}`, navigue);
 
-  const nego = etapes.filter(e => e.type === "NEGOTIATION");
+  const nego = etapes.filter(e => ["NEGOTIATION", "DEBRIEFING"].includes(e.type));
   majBoite("negociation", nego.length ? nego.map(e => {
     const j = nomDe(e.pid);
+    const label = e.type === "DEBRIEFING" ? `team ${j.equipe === 0 ? 'A' : 'B'} · debrief` : `team ${j.equipe === 0 ? 'A' : 'B'}`;
     const det = [e.proposition ? `proposal: ${esc(e.proposition)}` : "",
                  e.declencheur ? `trigger: <span class="mono">${esc(e.declencheur)}</span>` : "",
                  e.accord ? "<b>agreed</b>" : ""].filter(Boolean).join(" · ");
     return `<div class="refl ${e.i === idx ? "now" : ""}"><b class="e${j.equipe}">${esc(j.nom || "?")}</b>`
-         + ` <span class="eyebrow">team ${j.equipe === 0 ? 'A' : 'B'}</span><br>${esc(e.prive || "")}`
+         + ` <span class="eyebrow">${label}</span><br>${esc(e.prive || "")}`
          + (det ? `<br><span class="eyebrow">${det}</span>` : "") + `</div>`;
   }).join("") : '<p class="vide">Nothing yet.</p>', `n${nego.length}:${idx}`, navigue);
 
@@ -1331,7 +1335,9 @@ function rendreVide() {
   $("s-manche").textContent = "—";
   $("s-tour").textContent = "—";
   $("s-score").textContent = "0 – 0";
-  $("s-tok").textContent = "0";
+  $("s-tok-in").textContent = "0";
+  $("s-tok-cache").textContent = "0";
+  $("s-tok-out").textContent = "0";
   $("s-phase").textContent = "ready";
   
   $("q-tag").textContent = "WAIT";
@@ -1388,7 +1394,9 @@ function rendre() {
   $("s-manche").textContent = data.manche ?? "—";
   $("s-tour").textContent = data.tour ?? "—";
   $("s-score").textContent = data.scores ? `${data.scores?.["0"] ?? 0} – ${data.scores?.["1"] ?? 0}` : "0 – 0";
-  $("s-tok").textContent = (data.tokens?.grand_total ?? 0).toLocaleString("en-US");
+  $("s-tok-in").textContent = (data.tokens?.prompt_total ?? 0).toLocaleString("en-US");
+  $("s-tok-cache").textContent = (data.tokens?.cached_total ?? 0).toLocaleString("en-US");
+  $("s-tok-out").textContent = (data.tokens?.completion_total ?? 0).toLocaleString("en-US");
   $("s-phase").textContent = data.en_cours ? data.phase : "match finished";
 
   if (!t.length) {

@@ -47,6 +47,7 @@ class GeminiClient(LLMClient):
         self.prompt_tokens += u.get("promptTokenCount", 0)
         self.completion_tokens += u.get("candidatesTokenCount", 0)
         self.total_tokens += u.get("totalTokenCount", 0)
+        self.cached_tokens += u.get("cachedContentTokenCount", 0)
         try:
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError, TypeError):

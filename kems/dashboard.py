@@ -152,7 +152,9 @@ class Pilote:
     def _jouer(self, reglages: dict) -> None:
         from .run import jouer_partie
         try:
-            jouer_partie(reglages, self.publieur)
+            res = jouer_partie(reglages, self.publieur)
+            if res.get("interrompu"):
+                self.erreur = f"Game Interrupted: {res['interrompu']}"
         except Exception as e:                     # noqa: BLE001 — remonte tel quel a l'UI
             self.erreur = f"{type(e).__name__} : {e}"
 
@@ -211,6 +213,9 @@ class Pilote:
                     dump = extraire_tout(state, usage, seed, interrompu=bool(res.get("interrompu")))
                     with open(cible, "w", encoding="utf-8") as f:
                         json.dump(dump, f, ensure_ascii=False, indent=2)
+                if res.get("interrompu"):
+                    self.erreur = f"[seed {seed}] Game Interrupted: {res['interrompu']}"
+                    break
             
             self.batch_progres = {"courant": n, "total": n}
             regenerer(RESULTS_DIR)

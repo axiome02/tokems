@@ -23,6 +23,10 @@ def prompt_negociation(view: PlayerView, lang: str = "en") -> tuple[str, str]:
     return _mod(lang).prompt_negociation(view)
 
 
+def prompt_debriefing(view: PlayerView, lang: str = "en") -> tuple[str, str]:
+    return _mod(lang).prompt_debriefing(view)
+
+
 def prompt_reflexion(view: PlayerView, lang: str = "en") -> tuple[str, str]:
     return _mod(lang).prompt_reflexion(view)
 
@@ -37,3 +41,7 @@ def prompt_riposte(view: PlayerView, lang: str = "en") -> tuple[str, str]:
 
 def prompt_juge_signal(convention: str, declencheur: str, texte: str, lang: str = "en") -> tuple[str, str]:
     return _mod(lang).prompt_juge_signal(convention, declencheur, texte)
+
+
+def prompt_juge_riposte(convention: str, declencheur: str, reponse: str, lang: str = "en") -> tuple[str, str]:
+    return _mod(lang).prompt_juge_riposte(convention, declencheur, reponse)

@@ -212,11 +212,13 @@ def resoudre_appels(state: GameState, calls: dict[int, Call], ordre: list[int]) 
             return
 
 
-def resoudre_riposte(state: GameState, reponses: dict[int, str]) -> None:
+def resoudre_riposte(state: GameState, reponses: dict[int, str],
+                     reponses_trouvees: dict[int, bool] | None = None) -> None:
     """Riposte : l'equipe qui vient d'encaisser un KEMPS nomme le signal adverse.
 
     Si l'un de ses deux joueurs le demasque, elle renverse le resultat et gagne.
-    L'arbitrage est deterministe (voir `signaux.signal_trouve`), jamais confie a un LLM.
+    L'arbitrage s'appuie sur les resultats pre-evalues fournis (ex: par un Juge LLM),
+    ou retombe sur la detection litterale en guise de repli.
     """
     lang = state.config.lang
     equipe = state.riposte_equipe
@@ -230,10 +232,13 @@ def resoudre_riposte(state: GameState, reponses: dict[int, str]) -> None:
     gagnant: int | None = None
     for pid in state.joueurs_equipe(equipe):
         reponse = (reponses.get(pid) or "").strip()
-        # nommer le declencheur litteral suffit : c'est lui, le code. La convention bavarde
-        # ("on glisse la phrase X quand...") reste acceptee aussi.
-        trouve = (signal_trouve(signal_adverse, reponse)
-                  or signal_trouve(declencheur_adverse, reponse))
+        
+        if reponses_trouvees is not None:
+            trouve = reponses_trouvees.get(pid, False)
+        else:
+            trouve = (signal_trouve(signal_adverse, reponse)
+                      or signal_trouve(declencheur_adverse, reponse))
+                      
         tentatives.append({"pid": pid, "reponse": reponse, "trouve": trouve})
         _log(state, "RIPOSTE", pid,
              t(lang, "riposte_attempt_unmasked" if trouve else "riposte_attempt_wrong",

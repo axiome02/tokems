@@ -52,7 +52,7 @@ def parse_carte(texte: str, view: PlayerView):
 
 
 def parse_negociation(texte: str) -> Nego:
-    """Un tour de negociation -> Nego(message, proposition, declencheur, accord).
+    """Un tour de negociation -> Nego(message, proposition, declencheur, accord, plan).
 
     accord=True signifie que le joueur VERROUILLE la proposition sur la table.
     Chaque champ accepte son label FR et son label EN (le prompt envoye au modele n'utilise
@@ -66,11 +66,13 @@ def parse_negociation(texte: str) -> Nego:
     decl = _ligne(texte, "DECLENCHEUR") or _ligne(texte, "TRIGGER")
     accord_brut = (_ligne(texte, "ACCORD") or _ligne(texte, "AGREE") or "").strip().upper()
     accord = accord_brut.startswith("O") or accord_brut.startswith("Y")  # OUI / YES
+    plan = _ligne(texte, "PLAN")
     return Nego(
         message=msg,
         proposition=_nettoyer(prop) if prop else None,
         declencheur=_nettoyer(decl) if decl else None,
         accord=accord,
+        plan=plan.strip() if plan else None,
     )
 
 

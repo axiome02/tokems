@@ -12,6 +12,9 @@ class Agent:
     def negotiate(self, view: PlayerView) -> Nego:
         raise NotImplementedError
 
+    def debrief(self, view: PlayerView) -> Nego:
+        raise NotImplementedError
+
     def decide_card(self, view: PlayerView):
         raise NotImplementedError
 
@@ -25,6 +28,9 @@ class Agent:
         raise NotImplementedError
 
     def juger_signal(self, convention: str, declencheur: str, texte: str) -> bool:
+        raise NotImplementedError
+
+    def juger_riposte(self, convention: str, declencheur: str, reponse: str) -> bool:
         raise NotImplementedError
 
 
@@ -57,6 +63,9 @@ class LLMAgent(Agent):
     def negotiate(self, view: PlayerView) -> Nego:
         return parse.parse_negociation(self._ask(prompts.prompt_negociation(view, self.lang), pid=view.pid))
 
+    def debrief(self, view: PlayerView) -> Nego:
+        return parse.parse_negociation(self._ask(prompts.prompt_debriefing(view, self.lang), pid=view.pid))
+
     def decide_card(self, view: PlayerView):
         return parse.parse_carte(self._ask(prompts.prompt_micro_carte(view, self.lang), pid=view.pid), view)
 
@@ -81,3 +90,8 @@ class LLMAgent(Agent):
         cecite aux paraphrases."""
         return parse.parse_jugement(
             self._ask(prompts.prompt_juge_signal(convention, declencheur, texte, self.lang)))
+
+    def juger_riposte(self, convention: str, declencheur: str, reponse: str) -> bool:
+        """Appelle le Juge LLM pour evaluer si la riposte adverse est correcte semantiquement."""
+        return parse.parse_jugement(
+            self._ask(prompts.prompt_juge_riposte(convention, declencheur, reponse, self.lang)))

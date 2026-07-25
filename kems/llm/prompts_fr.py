@@ -25,13 +25,40 @@ def _fmt_cards(cards) -> str:
     return " ".join(str(c) for c in cards) if cards else "(vide)"
 
 
-def _fmt_chat_messages(events, limite: int = 8) -> str:
-    """Ne garde que la conversation recente (messages + appels), pas le bruit des echanges."""
-    conv = [ev for ev in events if ev.type in ("MESSAGE", "CALL")]
+def _fmt_chat_messages(events, current_manche: int, limite: int = 8) -> str:
+    """Ne garde que la conversation de la manche courante (messages + appels)."""
+    conv = [ev for ev in events if ev.type in ("MESSAGE", "CALL") and ev.manche == current_manche]
     conv = conv[-limite:]
     if not conv:
         return "(aucun message pour l'instant)"
     return "\n".join(ev.texte for ev in conv)
+
+
+def _fmt_historique(view: PlayerView) -> str:
+    """Formate les scores et l'historique des manches precedentes de maniere succincte."""
+    mon_score = view.scores.get(view.equipe, 0)
+    score_adv = view.scores.get(1 - view.equipe, 0)
+    lines = [
+        f"SCORE DU MATCH : Ton equipe : {mon_score} | Adversaires : {score_adv}",
+        f"MANCHE COURANTE : {view.manche}"
+    ]
+    if not view.historique_manches:
+        lines.append("HISTORIQUE : Premiere manche du match.")
+    else:
+        lines.append("HISTORIQUE :")
+        for h in view.historique_manches:
+            m = h.get("manche", "?")
+            winner = h.get("winner_team")
+            reason = h.get("reason", "")
+            
+            if winner is None:
+                res = "Nulle"
+            elif winner == view.equipe:
+                res = "Victoire"
+            else:
+                res = "Defaite"
+            lines.append(f"  - Manche {m} : {res} ({reason})")
+    return "\n".join(lines)
 
 
 # ─────────────────────────── micro : decision de carte ───────────────────────────
@@ -52,6 +79,11 @@ def prompt_micro_carte(view: PlayerView) -> tuple[str, str]:
 
 # ─────────────────────────── macro : negociation du signal ───────────────────────
 def prompt_negociation(view: PlayerView) -> tuple[str, str]:
+    consigne_signal = (
+        "Vous devez convenir d'une convention secrete, composee d'une proposition (un texte "
+        "ou un emoji qui servira de couverture dans vos messages publics pour dire 'j'ai un carre') "
+        "et d'un declencheur (les quelques mots exacts de la proposition a epingler)."
+    )
     system = (
         RAPPEL + "\n\n"
         "La partie n'a pas commence. Tu discutes en prive avec ton coequipier pour convenir d'un "
@@ -66,29 +98,19 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         "2. EN UN SEUL TEMPS — celui qui a le carre emet, l'autre crie KEMPS aussitot. N'inventez pas "
         "de protocole ou l'un attend une reponse ou une confirmation de l'autre : personne n'ose jamais "
         "commencer, et vous restez bloques tous les deux.\n"
-        "3. INVISIBLE APRES COUP — les adversaires peuvent crier COUNTER en cours de jeu des qu'ils "
+        "3. DURABLE FACE A L'ANALYSE — les adversaires peuvent crier COUNTER en cours de jeu des qu'ils "
         "soupconnent un carre, et si votre KEMPS reussit ils ont une derniere chance : chacun d'eux "
-        "relit TOUT le chat public et doit nommer votre message secret — une seule bonne reponse "
-        "et votre victoire devient la leur. Un declencheur qui detonne dans la conversation "
-        "ordinaire perd donc meme quand il marche : ton coequipier doit le reconnaitre "
-        "immediatement, mais quelqu'un qui epluche le chat apres coup ne doit rien y trouver "
-        "qui ressemble a un code.\n"
+        "relit TOUT le chat public et doit identifier votre declencheur exact. Si la chaine de caracteres "
+        "que vous avez choisie est statistiquement trop facile a reperer ou se distingue de facon evidente "
+        "de vos autres messages, ils la nommeront et vous perdrez. Votre declencheur doit donc etre "
+        "difficile a isoler par un observateur qui analyse l'historique du chat.\n"
         "Discutez pour de vrai : proposez, objectez, cherchez les failles. "
         "Ne validez que quand vous etes convaincus tous les deux de savoir la reconnaitre.\n"
         "Un dernier fait : aucune convention n'est a la fois invisible et immanquable — chaque "
         "choix arbitre un risque contre l'autre. Un bon compromis, scelle par vous deux, vaut "
-        "mieux qu'un code parfait jamais conclu."
-    )
-    dialogue = "\n".join(view.mon_chat_equipe) if view.mon_chat_equipe else "(tu ouvres la discussion)"
-    user = (
-        "━━ VOTRE DISCUSSION PRIVEE ━━\n"
-        f"{dialogue}\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"PROPOSITION SUR LA TABLE : {view.nego_proposition or '(aucune)'}\n"
-        f"DECLENCHEUR SUR LA TABLE : {view.nego_declencheur or '(aucun)'}\n"
-        f"ECHANGES RESTANTS (a vous deux) : {view.nego_restants}. Sans accord scelle d'ici la, "
-        "vous jouerez avec la proposition sur la table telle quelle — sans preuve que ton "
-        "coequipier la lit comme toi.\n\n"
+        "mieux qu'un code parfait jamais conclu.\n\n"
+        f"{consigne_signal}\n"
+        "Profitez de cet echange pour egalement initialiser votre PLAN / STRATEGIE PERSISTANT personnel.\n\n"
         "Reponds sur ces lignes :\n"
         "MESSAGE: <ce que tu dis a ton coequipier>\n"
         "PROPOSITION: <la convention que tu proposes ; recopie celle sur la table si tu la gardes>\n"
@@ -98,6 +120,72 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         "le declencheur sur la table — c'est ainsi que vous prouvez tous les deux etre d'accord "
         "sur le meme texte exact."
     )
+    dialogue = "\n".join(view.mon_chat_equipe) if view.mon_chat_equipe else "(tu ouvres la discussion)"
+    user = (
+        "━━ CONTEXTE DU MATCH ━━\n"
+        f"{_fmt_historique(view)}\n"
+        "━━ VOTRE DISCUSSION PRIVEE ━━\n"
+        f"{dialogue}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"PROPOSITION SUR LA TABLE : {view.nego_proposition or '(aucune)'}\n"
+        f"DECLENCHEUR SUR LA TABLE : {view.nego_declencheur or '(aucun)'}\n"
+        f"ECHANGES RESTANTS (a vous deux) : {view.nego_restants}. Sans accord scelle d'ici la, "
+        "vous jouerez avec la proposition sur la table telle quelle — sans preuve que ton "
+        "coequipier la lit comme toi."
+    )
+    return system, user
+
+
+# ─────────────────────────── macro : debriefing d'equipe ───────────────────────
+def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
+    from ..engine import rules
+    # Est-ce que le signal precedent a ete brule/demasque ?
+    brule = False
+    if view.historique_manches:
+        derniere = view.historique_manches[-1]
+        rip = derniere.get("riposte")
+        if rip and rip.get("reussie", False) and rip.get("equipe") != view.equipe:
+            brule = True
+
+    consigne_signal = ""
+    if brule:
+        consigne_signal = (
+            "ATTENTION : Votre message secret precedent a ete DEMASQUE et BRULE par vos adversaires. "
+            "Vous DEVEZ imperativement convenir d'un NOUVEAU message secret (nouvelle phrase et nouveau declencheur)."
+        )
+    else:
+        consigne_signal = (
+            "Votre message secret precedent is toujours valide. Cependant, pour eviter que les adversaires "
+            "ne finissent par le comprendre a force de vous observer, vous pouvez decider de le conserver ou "
+            "de le changer/faire tourner de maniere proactive."
+        )
+
+    system = (
+        RAPPEL + "\n\n"
+        "La manche vient de se terminer. Tu discutes en prive avec ton coequipier pour debriefer la manche, "
+        "ajuster votre strategie, et convenir de votre MESSAGE SECRET pour la manche suivante.\n"
+        f"{consigne_signal}\n"
+        "Profitez de cet echange pour egalement mettre a jour votre PLAN / STRATEGIE PERSISTANT personnel.\n\n"
+        "Reponds sur ces lignes :\n"
+        "MESSAGE: <ce que tu dis a ton coequipier>\n"
+        "PROPOSITION: <la convention que tu proposes pour la suite ; recopie celle sur la table ou le signal actuel pour le garder>\n"
+        "DECLENCHEUR: <le texte exact a reperer, quelques mots seulement>\n"
+        "ACCORD: OUI ou NON (verrouille la proposition de ton coequipier si tu es d'accord)\n"
+        "PLAN: <ton plan et ta strategie privee pour la manche suivante, max 3 lignes>"
+    )
+    dialogue = "\n".join(view.mon_chat_equipe) if view.mon_chat_equipe else "(debut du debriefing de cette manche)"
+    user = (
+        "━━ CONTEXTE DU MATCH ━━\n"
+        f"{_fmt_historique(view)}\n"
+        "━━ VOTRE DISCUSSION PRIVEE DE DEBRIEFING ━━\n"
+        f"{dialogue}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"VOTRE SIGNAL ACTUEL : {view.mon_signal or '(aucun)'}\n"
+        f"VOTRE DECLENCHEUR ACTUEL : {view.mon_declencheur or '(aucun)'}\n"
+        f"PROPOSITION SUR LA TABLE : {view.nego_proposition or '(aucune)'}\n"
+        f"DECLENCHEUR SUR LA TABLE : {view.nego_declencheur or '(aucun)'}\n"
+        f"ECHANGES RESTANTS (a vous deux) : {view.nego_restants}."
+    )
     return system, user
 
 
@@ -105,48 +193,30 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
 def prompt_reflexion(view: PlayerView) -> tuple[str, str]:
     """Monologue interieur : personne ne le lit, aucun format impose, aucune conclusion suggeree."""
     system = (
-        RAPPEL + "\n\n"
-        "Tu prends un instant pour reflechir avant de parler en public. Ce que tu ecris ici est "
-        "strictement pour toi : ni ton coequipier ni tes adversaires ne le liront jamais. "
-        "Sois bref : 3 lignes maximum, pas de titres, pas de listes, pas de plan d'action detaille. "
-        "Va droit a ce qui compte maintenant."
+        "Tu joues au Kems. Prends un temps de reflexion interieure (monologue) "
+        "pour analyser froidement la situation avant de parler en public. "
+        "Ce monologue n'est lu par personne. Rédige ton raisonnement librement."
     )
     journal = "\n".join(f"- {l}" for l in view.mon_journal[-2:]) or "(rien encore)"
     user = (
+        "━━ CONTEXTE DU MATCH ━━\n"
+        f"{_fmt_historique(view)}\n"
         "━━ FAITS OFFICIELS ━━\n"
         f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}  |  TES ADVERSAIRES: {' et '.join(view.adversaires)}\n"
         f"TA MAIN: {_fmt_cards(view.ma_main)}  |  AS-TU UN CARRE: {'OUI' if view.jai_un_carre else 'NON'}\n"
         f"VOTRE MESSAGE SECRET CONVENU: {view.mon_signal}\n"
         f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.mon_declencheur}\n"
+        f"TON PLAN / STRATEGIE PERSISTANT : {view.mon_plan or '(aucun)'}\n"
         "━━ MESSAGES PUBLICS RECENTS ━━\n"
-        f"{_fmt_chat_messages(view.chat_global)}\n"
+        f"{_fmt_chat_messages(view.chat_global, view.manche)}\n"
         "━━ TES REFLEXIONS PRECEDENTES ━━\n"
         f"{journal}\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "A quoi penses-tu, la, maintenant ?"
     )
     return system, user
 
 
 # ─────────────────────────── macro : discussion / signal / appel ──────────────────
 def prompt_discussion(view: PlayerView) -> tuple[str, str]:
-    system = (
-        RAPPEL + "\n\n"
-        "Phase de discussion publique : tu ecris un message que TOUT LE MONDE lit, puis tu decides "
-        "d'un appel. Deux faits independants peuvent etre vrais au MEME tour : tu peux toi-meme "
-        "avoir un carre (alors c'est a toi de le signaler, n'attends rien), et/ou ton coequipier "
-        "peut en avoir un (alors un appel KEMPS gagne, base uniquement sur SA main, jamais la "
-        "tienne). Verifie les deux a chaque tour — l'un n'exclut pas l'autre.\n"
-        "Votre message convenu joue dans les deux sens : tout message public de toi qui porte "
-        "votre declencheur dit a ton coequipier « j'ai un carre », quelle qu'ait ete ton "
-        "intention — le citer, le commenter ou en plaisanter, c'est L'EMETTRE, et c'est aussi "
-        "le livrer aux deux adversaires. Il n'existe aucun moyen de mentionner ton declencheur "
-        "en public sans envoyer le signal.\n"
-        "Ecris toujours un vrai message, a chaque tour, que tu aies quelque chose a signaler ou "
-        "non : si seul le joueur qui a un carre parle, ton silence devient lui-meme l'indice. "
-        "Reagis a ce qui vient d'etre dit plutot que de lancer une phrase isolee — ca doit se lire "
-        "comme une conversation continue, pas une suite de declarations ponctuelles."
-    )
     if view.jai_un_carre:
         consigne = (
             "Tu as un carre en ce moment. Signale-le — n'attends ni permission ni signe de la part "
@@ -163,17 +233,23 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
             "perd la manche. Relis ton MESSAGE avant de l'envoyer : le declencheur ne doit s'y "
             "trouver que si tu l'emets volontairement, en acceptant ce cout."
         )
-    user = (
-        "━━ FAITS OFFICIELS ━━\n"
-        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}  |  TES ADVERSAIRES: {' et '.join(view.adversaires)}\n"
-        f"TA MAIN: {_fmt_cards(view.ma_main)}  |  AS-TU UN CARRE: {'OUI' if view.jai_un_carre else 'NON'}\n"
-        f"VOTRE MESSAGE SECRET CONVENU: {view.mon_signal}\n"
-        f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.mon_declencheur}\n"
-        "━━ MESSAGES PUBLICS RECENTS ━━\n"
-        f"{_fmt_chat_messages(view.chat_global)}\n"
-        "━━ CE QUE TU VIENS DE TE DIRE (en prive) ━━\n"
-        f"{view.ma_reflexion or '(rien)'}\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    system = (
+        RAPPEL + "\n\n"
+        "Phase de discussion publique : tu ecris un message que TOUT LE MONDE lit, puis tu decides "
+        "d'un appel. Deux faits independants peuvent etre vrais au MEME tour : tu peux toi-meme "
+        "avoir un carre (alors c'est a toi de le signaler, n'attends rien), et/ou ton coequipier "
+        "peut en avoir un (alors un appel KEMPS gagne, base uniquement sur SA main, jamais la "
+        "tienne). Verifie les deux a chaque tour — l'un n'exclut pas l'autre.\n"
+        "Votre message convenu joue dans les deux sens : tout message public de toi qui porte "
+        "votre declencheur dit a ton coequipier « j'ai un carre », quelle qu'ait ete ton "
+        "intention — le citer, le commenter ou en plaisanter, c'est L'EMETTRE, et c'est aussi "
+        "le livrer aux deux adversaires. Il n'existe aucun moyen de mentionner ton declencheur "
+        "en public sans envoyer le signal.\n"
+        "Ecris toujours un vrai message, a chaque tour, que tu aies quelque chose a signaler ou "
+        "non : si seul le joueur qui a un carre parle, ton silence devient lui-meme l'indice. "
+        "Reagis a ce qui vient d'etre dit plutot que de lancer une phrase isolee — ca doit se lire "
+        "comme une conversation continue, pas une suite de declarations ponctuelles.\n\n"
+        "CONSIGNES CONCERNANT LE CARRE :\n"
         f"{consigne}\n\n"
         "DEFINITION DES OPTIONS D'APPEL :\n"
         "- KEMPS : Appelle uniquement si tu penses que TON COEQUIPIER a un carre. Gagne s'il en a un, perd sinon.\n"
@@ -185,6 +261,20 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         "TRIGGER_CHECK: OUI ou NON (relis ton MESSAGE ci-dessus : contient-il votre declencheur ?)\n"
         "CALL: KEMPS | COUNTER | NONE\n"
         "PLAN: <ton plan prive, 1 ligne>"
+    )
+    user = (
+        "━━ CONTEXTE DU MATCH ━━\n"
+        f"{_fmt_historique(view)}\n"
+        "━━ FAITS OFFICIELS ━━\n"
+        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}  |  TES ADVERSAIRES: {' et '.join(view.adversaires)}\n"
+        f"TA MAIN: {_fmt_cards(view.ma_main)}  |  AS-TU UN CARRE: {'OUI' if view.jai_un_carre else 'NON'}\n"
+        f"VOTRE MESSAGE SECRET CONVENU: {view.mon_signal}\n"
+        f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.mon_declencheur}\n"
+        f"TON PLAN / STRATEGIE PERSISTANT : {view.mon_plan or '(aucun)'}\n"
+        "━━ MESSAGES PUBLICS RECENTS ━━\n"
+        f"{_fmt_chat_messages(view.chat_global, view.manche)}\n"
+        "━━ CE QUE TU VIENS DE TE DIRE (en prive) ━━\n"
+        f"{view.ma_reflexion or '(rien)'}\n"
     )
     return system, user
 
@@ -198,7 +288,7 @@ def prompt_riposte(view: PlayerView) -> tuple[str, str]:
     )
     user = (
         "━━ TOUT LE CHAT PUBLIC ━━\n"
-        f"{_fmt_chat_messages(view.chat_global, limite=100)}\n"
+        f"{_fmt_chat_messages(view.chat_global, view.manche, limite=100)}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"ADVERSAIRES : {' et '.join(view.adversaires)}\n\n"
         "Reponds sur ces lignes :\n"
@@ -224,6 +314,29 @@ def prompt_juge_signal(convention: str, declencheur: str, texte: str) -> tuple[s
         f"CONVENTION CONVENUE PAR L'EQUIPE : {convention}\n"
         f"DECLENCHEUR LITTERAL NOTE (peut etre partiel ou absent) : {declencheur or '(aucun)'}\n"
         f"MESSAGES RECENTS A JUGER :\n{texte}\n\n"
+        "Reponds sur ces lignes :\n"
+        "RAISONNEMENT: <1 phrase>\n"
+        "SIGNAL: OUI ou NON"
+    )
+    return system, user
+
+
+# ─────────────────────────── juge : la riposte adverse est-elle correcte ? ────
+def prompt_juge_riposte(convention: str, declencheur: str, reponse: str) -> tuple[str, str]:
+    """Evaluateur de riposte : juge si la reponse adverse a demasque le signal sémantiquement."""
+    system = (
+        "Tu es un arbitre de Kems. Ton role est de juger si un joueur a demasque le message secret "
+        "de l'equipe adverse. L'equipe adverse avait convenu d'une convention/signal. Le joueur adverse "
+        "a tente une reponse pour nommer ce signal. Evalue s'ils ont correctement identifie et compris "
+        "le secret semantiquement (meme s'il y a des paraphrases, des explications, des synonymes, ou s'ils "
+        "decrivent correctement la structure du signal comme la ponctuation ou les emojis).\n"
+        "Reponds UNIQUEMENT par 'SIGNAL: OUI' ou 'SIGNAL: NON' apres un bref raisonnement."
+    )
+    user = (
+        f"CONVENTION SECRETE ADVERSE : {convention}\n"
+        f"DECLENCHEUR DU SIGNAL : {declencheur}\n"
+        f"TENTATIVE DE REPONSE DU JOUEUR : {reponse}\n\n"
+        "L'adversaire a-t-il compris/demasque le signal secret ?\n"
         "Reponds sur ces lignes :\n"
         "RAISONNEMENT: <1 phrase>\n"
         "SIGNAL: OUI ou NON"

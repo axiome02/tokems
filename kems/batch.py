@@ -85,6 +85,9 @@ def extraire_partie(state, usage: dict, seed: int) -> dict:
         "nego_convergence_0": state.nego_convergence.get(0),
         "nego_convergence_1": state.nego_convergence.get(1),
         "tokens_total": usage.get("grand_total", 0),
+        "tokens_cached": usage.get("cached_total", 0),
+        "tokens_prompt": usage.get("prompt_total", 0),
+        "tokens_completion": usage.get("completion_total", 0),
         "nb_episodes": len(state.episodes),
         # paris a l'aveugle : KEMPS crie sans qu'aucun declencheur n'ait ete repere (voir CLAUDE.md,
         # ce compteur herite de la cecite aux paraphrases : « aucun detecte » != « aucun emis »)
@@ -181,6 +184,9 @@ def agreger(dumps: list[dict]) -> dict:
         "nb_parties": len(parties),
         "nb_episodes": n_ep,
         "tokens_total": sum(p["tokens_total"] for p in parties),
+        "tokens_cached": sum(p.get("tokens_cached", 0) for p in parties),
+        "tokens_prompt": sum(p.get("tokens_prompt", 0) for p in parties),
+        "tokens_completion": sum(p.get("tokens_completion", 0) for p in parties),
         # ⚠️ tour_signal est un MINORANT : on donne la borne basse ET la borne haute, jamais un seul chiffre.
         "transmission_minorant": _taux(etats[RECONNU], n_ep),
         "transmission_borne_haute": _taux(etats[RECONNU] + etats[PARLE_SANS_RECONNAISSANCE], n_ep),
@@ -199,6 +205,14 @@ def agreger(dumps: list[dict]) -> dict:
         },
         "detection_par_modele": det_par_modele,
         "funnel": funnel,
+        "detail_parties": [{
+            "seed": p.get("seed", 0),
+            "tokens_total": p.get("tokens_total", 0),
+            "tokens_cached": p.get("tokens_cached", 0),
+            "tokens_prompt": p.get("tokens_prompt", 0),
+            "tokens_completion": p.get("tokens_completion", 0),
+        } for p in parties],
+        "codes_inventes": [c for d in dumps for c in d.get("codes", [])],
     }
 
 

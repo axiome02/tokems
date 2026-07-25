@@ -31,6 +31,7 @@ class Nego:
     proposition: str | None
     declencheur: str | None      # le texte litteral que le moteur devra savoir reperer
     accord: bool
+    plan: str | None = None      # plan personnel / memoire (optionnel)
 
 
 @dataclass

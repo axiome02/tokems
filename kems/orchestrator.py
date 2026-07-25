@@ -165,13 +165,75 @@ def negotiation(state: GameState, agents: dict, equipes: tuple[int, ...] | None 
         rules.poser_signal(state, equipe, proposition or AUCUN_SIGNAL, declencheur)
 
 
+def debriefing_phase(state: GameState, agents: dict) -> None:
+    """Phase de debriefing et de rotation/adaptation de code a la fin d'une manche (max 4 tours)."""
+    state.phase = "DEBRIEFING"
+    lang = state.config.lang
+    
+    for equipe in (0, 1):
+        # On repart d'un canal de discussion vide pour ce debriefing inter-manches
+        brule = rules.signal_brule(state, equipe)
+        state.team_channels[equipe] = []
+        if brule:
+            state.team_channels[equipe].append(t(state.config.lang, "signal_burned_notice"))
+            
+        joueurs = state.joueurs_equipe(equipe)
+        
+        # Le signal actuel sert de base
+        proposition = state.signals.get(equipe, "")
+        declencheur = state.declencheurs.get(equipe, "")
+        proposeur: int | None = None
+        scelle = False
+        
+        # Debriefing en 4 tours maximum (2 tours de parole par joueur)
+        max_tours_debriefing = 4
+        for nt in range(max_tours_debriefing):
+            pid = joueurs[nt % len(joueurs)]
+            view = vue_pour(state, pid, nego_proposition=proposition,
+                            nego_declencheur=declencheur,
+                            nego_restants=max_tours_debriefing - nt)
+            
+            n = agents[pid].debrief(view)
+            nom = state.players[pid].nom
+            if n.message:
+                state.team_channels[equipe].append(f"{nom}: {n.message}")
+            if n.plan:
+                state.plans[pid] = n.plan
+                
+            accord_mot = t(lang, "yes_word" if n.accord else "no_word")
+            rules.etape(state, "DEBRIEFING", pid,
+                        t(lang, "negotiating", nom=nom), prive=n.message,
+                        proposition=n.proposition, declencheur=n.declencheur, accord=n.accord,
+                        **_extras_decision(view, agents[pid],
+                                           f"MESSAGE='{n.message}' PROPOSITION='{n.proposition}' "
+                                           f"DECLENCHEUR='{n.declencheur}' ACCORD={accord_mot} PLAN='{n.plan}'"))
+            
+            echo = bool(n.proposition and proposition
+                        and normaliser(n.proposition) == normaliser(proposition))
+            readback = bool(declencheur and n.declencheur
+                            and normaliser(n.declencheur) == normaliser(declencheur))
+            if ((n.accord or echo) and proposition and proposeur is not None
+                    and proposeur != pid and readback
+                    and rules.declencheur_exploitable(declencheur)):
+                scelle = True
+                break
+            if n.proposition:
+                proposition, proposeur = n.proposition, pid
+                declencheur = n.declencheur or ""
+                
+        # On met a jour le signal
+        rules.poser_signal(state, equipe, proposition or AUCUN_SIGNAL, declencheur)
+
+
 def exchange_phase(state: GameState, agents: dict) -> None:
     state.phase = "EXCHANGE"
     cfg = state.config
+    nb_joueurs = cfg.nb_joueurs
+    passes_consecutifs = 0
     st = 0
+    ordre = _ordre(state)
     while st < cfg.max_sous_tours_par_centre:
-        un_take = False
-        for pid in _ordre(state):
+        for pid in ordre:
             nom = state.players[pid].nom
             if est_carre(state.hands[pid]):
                 # episode ouvert en silence : le chat est public, un carre est prive.
@@ -188,7 +250,7 @@ def exchange_phase(state: GameState, agents: dict) -> None:
                                prise=str(action.from_center), repose=str(action.discard),
                                **_extras_decision(view, agents[pid],
                                                   f"TAKE {action.from_center} DISCARD {action.discard}"))
-                    un_take = True
+                    passes_consecutifs = 0
                     if est_carre(state.hands[pid]):
                         # episode ouvert en silence : le chat est public, un carre est prive
                         rules.ouvrir_episode(state, pid)
@@ -196,12 +258,17 @@ def exchange_phase(state: GameState, agents: dict) -> None:
                     rules._log(state, "SYSTEM", pid, t(state.config.lang, "illegal_exchange", nom=nom),
                                **_extras_decision(view, agents[pid],
                                                   f"ILLEGAL {action.from_center}/{action.discard} -> PASS"))
+                    passes_consecutifs += 1
             else:
                 rules._log(state, "PASS", pid, t(state.config.lang, "passes", nom=nom),
                            **_extras_decision(view, agents[pid], "PASS"))
-        st += 1
-        if not un_take:
+                passes_consecutifs += 1
+            
+            if passes_consecutifs >= nb_joueurs:
+                break
+        if passes_consecutifs >= nb_joueurs:
             break
+        st += 1
     rules.resoudre_poubelle(state)
     rules._log(state, "SWEEP", None,
                t(state.config.lang, "center_swept",
@@ -233,7 +300,7 @@ def _juger_transmission_kemps(state: GameState, agents: dict) -> None:
     if texte:
         # sous filet : une mesure qui echoue (429, reseau) ne tue jamais la partie
         try:
-            evaluateur = agents.get("evaluateur") or agents.get(0)
+            evaluateur = agents.get("evaluateur")
             if evaluateur is not None:
                 o["signal_reellement_emis_llm"] = evaluateur.juger_signal(convention, declencheur, texte)
         except Exception:
@@ -295,7 +362,7 @@ def discussion_phase(state: GameState, agents: dict) -> None:
                     # (cf. l'exemple "purple giraffes... dance... at midnight" assemble a deux).
                     # Sous filet : une mesure qui echoue (429, reseau) ne tue JAMAIS la partie.
                     try:
-                        evaluateur = agents.get("evaluateur") or agents.get(0)
+                        evaluateur = agents.get("evaluateur")
                         if evaluateur is not None and state.config.evaluer_signaux:
                             compris = evaluateur.juger_signal(
                                 state.signals.get(equipe, ""), declencheur, _texte_recent(state))
@@ -318,7 +385,7 @@ def riposte_phase(state: GameState, agents: dict) -> None:
     """Dernier recours : l'equipe qui vient d'encaisser un KEMPS tente de nommer le signal adverse.
 
     Ses 2 joueurs repondent (avec TOUT l'historique public sous les yeux) ; une seule bonne
-    reponse suffit a renverser la partie. C'est la mesure de detection du signal.
+    reponse suffit a renverser la partie. L'arbitrage s'appuie sur un Juge LLM.
     """
     state.phase = "RIPOSTE"
     equipe = state.riposte_equipe
@@ -332,7 +399,28 @@ def riposte_phase(state: GameState, agents: dict) -> None:
                     t(state.config.lang, "riposte_attempt", nom=state.players[pid].nom),
                     prive=guess.reponse,
                     **_extras_decision(view, agents[pid], f"SIGNAL_ADVERSE='{guess.reponse}'"))
-    rules.resoudre_riposte(state, reponses)
+
+    # Juge LLM semantique
+    reponses_trouvees = {}
+    evaluateur = agents.get("evaluateur")
+    signal_adverse = state.signals.get(1 - equipe, "")
+    declencheur_adverse = state.declencheurs.get(1 - equipe, "")
+    for pid, reponse in reponses.items():
+        if not reponse.strip():
+            reponses_trouvees[pid] = False
+            continue
+        try:
+            if evaluateur is not None:
+                reponses_trouvees[pid] = evaluateur.juger_riposte(signal_adverse, declencheur_adverse, reponse)
+            else:
+                raise ValueError("No dedicated evaluator agent configured")
+        except Exception:
+            # Fallback deterministe en cas de souci API (quota, timeout...)
+            from .engine import signaux
+            reponses_trouvees[pid] = (signaux.signal_trouve(signal_adverse, reponse)
+                                      or signaux.signal_trouve(declencheur_adverse, reponse))
+
+    rules.resoudre_riposte(state, reponses, reponses_trouvees)
 
 
 def play_manche(state: GameState, agents: dict) -> None:
@@ -370,11 +458,6 @@ def play_game(config: Config, modeles: list[str], agents: dict, on_event=None) -
         rules.cloturer_manche(state)
         if state.match_termine:
             break
+        debriefing_phase(state, agents)
         nouvelle_manche(state)
-        # un signal demasque est brule : cette equipe DOIT en convenir d'un nouveau
-        a_renegocier = tuple(e for e in (0, 1) if rules.signal_brule(state, e))
-        if a_renegocier:
-            for e in a_renegocier:
-                state.team_channels[e].append(t(config.lang, "signal_burned_notice"))
-            negotiation(state, agents, equipes=a_renegocier)
     return state

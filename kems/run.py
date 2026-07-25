@@ -27,12 +27,19 @@ def usage_summary(agents: dict) -> dict:
         client = getattr(a, "client", None)
         if client is None:
             continue
-        d = per_model.setdefault(client.nom, {"calls": 0, "prompt": 0, "completion": 0, "total": 0})
+        d = per_model.setdefault(client.nom, {"calls": 0, "prompt": 0, "completion": 0, "cached": 0, "total": 0})
         d["calls"] += getattr(client, "calls", 0)
         d["prompt"] += getattr(client, "prompt_tokens", 0)
         d["completion"] += getattr(client, "completion_tokens", 0)
+        d["cached"] += getattr(client, "cached_tokens", 0)
         d["total"] += getattr(client, "total_tokens", 0)
-    return {"per_model": per_model, "grand_total": sum(d["total"] for d in per_model.values())}
+    return {
+        "per_model": per_model,
+        "grand_total": sum(d["total"] for d in per_model.values()),
+        "prompt_total": sum(d["prompt"] for d in per_model.values()),
+        "completion_total": sum(d["completion"] for d in per_model.values()),
+        "cached_total": sum(d["cached"] for d in per_model.values()),
+    }
 
 
 CLIENTS = {
@@ -143,7 +150,9 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
 
     eval_agent = reglages.get("eval_agent")
     eval_model = reglages.get("eval_model")
-    if eval_agent:
+    if not eval_agent:
+        config.evaluer_signaux = False
+    else:
         agents["evaluateur"] = build_agent(eval_agent, eval_model, pause, None, lang)
     if publieur is not None:
         publieur.rebrancher(lambda: usage_summary(agents))

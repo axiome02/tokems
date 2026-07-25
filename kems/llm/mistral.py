@@ -44,6 +44,8 @@ class MistralClient(LLMClient):
         self.prompt_tokens += u.get("prompt_tokens", 0)
         self.completion_tokens += u.get("completion_tokens", 0)
         self.total_tokens += u.get("total_tokens", 0)
+        details = u.get("prompt_tokens_details") or {}
+        self.cached_tokens += details.get("cached_tokens", 0)
         try:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):

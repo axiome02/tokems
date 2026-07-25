@@ -10,6 +10,7 @@ class LLMClient:
         self.calls = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
+        self.cached_tokens = 0
         self.total_tokens = 0
 
     def chat(self, system: str, user: str, max_tokens: int | None = None) -> str:

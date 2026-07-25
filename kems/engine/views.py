@@ -26,6 +26,10 @@ class PlayerView:
     centre: list[Card]                   # public
     chat_global: list[Event]             # fenetre bornee du chat public
 
+    scores: dict[int, int] = field(default_factory=dict)   # score du match
+    manche: int = 1                                        # numero de la manche courante
+    historique_manches: list[dict] = field(default_factory=list)  # historique des manches ecoulees
+
     nego_proposition: str = ""           # negociation : le signal candidat en cours de discussion
     nego_declencheur: str = ""           # negociation : le declencheur sur la table (a re-ecrire pour sceller)
     nego_restants: int = 0               # negociation : echanges restants avant le figeage au plafond
@@ -53,6 +57,9 @@ def vue_pour(state: GameState, pid: int,
         mon_journal=list(state.journaux.get(pid, [])),
         centre=list(state.center),
         chat_global=list(state.public_log[-fen:]),
+        scores=dict(state.scores),
+        manche=state.manche,
+        historique_manches=list(state.historique_manches),
         nego_proposition=nego_proposition,
         nego_declencheur=nego_declencheur,
         nego_restants=nego_restants,

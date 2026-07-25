@@ -54,6 +54,7 @@ class ClaudeClient(LLMClient):
         self.prompt_tokens += prompt
         self.completion_tokens += completion
         self.total_tokens += prompt + completion
+        self.cached_tokens += u.get("cache_read_input_tokens", 0)
         try:
             return data["content"][0]["text"]
         except (KeyError, IndexError, TypeError):
