@@ -7,14 +7,14 @@ from .client import LLMClient
 
 
 class GeminiClient(LLMClient):
-    """Client Gemini (Google AI Studio). Cle via GEMINI_API_KEY."""
+    """Gemini Client (Google AI Studio). Key via GEMINI_API_KEY."""
 
     nom = "gemini"
     BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    # gemini-2.5-flash : quota gratuit mesure a 20 requetes/JOUR sur ce projet — inutilisable
-    # pour une partie (qui en consomme des dizaines). gemini-flash-lite-latest tolere 60+
-    # appels/jour sans encombre (mesure du 22/07/2026, cf. transcripts game_3030/4040/5050).
+    # gemini-2.5-flash: free quota measured at 20 requests/DAY on this project - unusable
+    # for a game (which consumes dozens). gemini-flash-lite-latest tolerates 60+
+    # calls/day without issue (measured on 2026-07-22).
     def __init__(self, model: str = "gemini-flash-lite-latest", api_key: str | None = None,
                  temperature: float = 0.7, max_tokens: int = 1024,
                  pause: float = 0.5, retries: int = 4, timeout: int = 60):

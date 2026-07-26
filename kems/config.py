@@ -5,38 +5,38 @@ from dataclasses import dataclass
 
 @dataclass
 class Config:
-    """Tous les boutons de reglage de la partie (voir CLAUDE.md, amelioration #1)."""
+    """All configuration options for the game (see CLAUDE.md, improvement #1)."""
 
-    nb_rangs: int = 10                 # cartes 1..nb_rangs (defaut 1-10 = 40 cartes, carres moins rapides)
-    nb_joueurs: int = 4
-    taille_main: int = 4
-    taille_centre: int = 4
+    num_ranks: int = 10                 # cards 1..num_ranks (default 1-10 = 40 cards, squares slower)
+    num_players: int = 4
+    hand_size: int = 4
+    center_size: int = 4
 
-    # format : un MATCH est une suite de manches, chaque manche gagnee vaut 1 point
-    points_pour_gagner: int = 3
-    max_manches: int = 9               # borne de cout : au-dela, le match s'arrete au score
+    # format: a MATCH is a sequence of rounds, each round win is worth 1 point
+    points_to_win: int = 3
+    max_rounds: int = 9               # cost bound: beyond this, the match stops at current score
 
-    # bornes de cout / duree (par manche)
-    max_sous_tours_par_centre: int = 3
-    max_centres_par_partie: int = 12
-    max_tours: int = 8                 # ~5 tours sont necessaires entre l'emission et le KEMPS
-    max_tours_negociation: int = 10    # echanges A<->B max par equipe pour convenir du signal
-    tours_discussion: int = 2          # passes de parole par phase de discussion (chacun parle N fois)
+    # cost/length bounds (per round)
+    max_subturns_per_center: int = 3
+    max_centers_per_round: int = 12
+    max_turns: int = 8                 # ~5 turns are needed between signaling and KEMPS
+    max_negotiation_turns: int = 10    # max exchange turns A<->B per team to agree on the signal
+    discussion_turns: int = 2          # speech turns per discussion phase (everyone speaks N times)
 
-    # combien des derniers evenements publics on envoie au LLM
-    fenetre_chat: int = 40
+    # how many of the last public events are sent to the LLM
+    chat_window: int = 40
 
     master_seed: int = 0
-    # surcharges optionnelles : par defaut les deux flux sont derives du master_seed, mais on
-    # peut les fixer separement (rejouer la meme donne avec un autre ordre de jeu, par exemple)
+    # optional overrides: by default both streams are derived from master_seed, but they
+    # can be fixed separately (e.g. to replay the same deal with a different play order)
     seed_cards: int | None = None
     seed_order: int | None = None
 
-    # langue de la partie : prompts LLM + evenements publics + transcript. "en" ou "fr".
-    # Defaut "en" (norme des benchmarks publics) ; aucun recalibrage n'a ete fait pour "fr"
-    # depuis l'introduction du multilingue (22/07/2026) : les mesures de reference restent en francais.
+    # game language: LLM prompts + public events + transcript. "en" or "fr".
+    # Default "en" (public benchmark standard); no recalibration has been done for "fr"
+    # since multilingual support was added (2026-07-22): reference measurements remain in French.
     lang: str = "en"
 
-    # Optionnel : Evaluation semantique de la transmission du signal via LLM
-    evaluer_signaux: bool = True      # si True, appelle un juge LLM pour evaluer la transmission
-    modele_evaluateur: str | None = None  # specifie le modele/fournisseur du juge (ex: "gpt-4o")
+    # Optional: Semantic evaluation of the signal transmission via LLM
+    eval_signals: bool = True      # if True, calls an LLM judge to evaluate the transmission
+    evaluator_model: str | None = None  # specifies the model/provider of the judge (e.g. "gpt-4o")

@@ -7,7 +7,7 @@ from .cards import Card
 
 @dataclass
 class Take:
-    """Echange 1-pour-1 : prendre `from_center` au centre, reposer `discard` de sa main."""
+    """1-for-1 exchange: take `from_center` from the center, discard `discard` from one's hand."""
 
     from_center: Card
     discard: Card
@@ -15,7 +15,7 @@ class Take:
 
 @dataclass
 class Pass:
-    """Ne rien prendre ce sous-tour."""
+    """Do not take anything this subturn."""
 
 
 @dataclass
@@ -25,17 +25,17 @@ class Call:
 
 @dataclass
 class Nego:
-    """Un tour de negociation : ce que le joueur dit, propose, et le declencheur exact retenu."""
+    """A negotiation turn: what the player says, proposes, and the exact trigger kept."""
 
     message: str
     proposition: str | None
-    declencheur: str | None      # le texte litteral que le moteur devra savoir reperer
-    accord: bool
-    plan: str | None = None      # plan personnel / memoire (optionnel)
+    trigger: str | None      # the literal text the engine will have to detect
+    agree: bool
+    plan: str | None = None      # personal plan / memory (optional)
 
 
 @dataclass
 class Guess:
-    """Riposte : la reponse d'un joueur quand on lui demande le signal secret adverse."""
+    """Comeback (riposte): a player's answer when asked for the opponents' secret signal."""
 
-    reponse: str
+    response: str

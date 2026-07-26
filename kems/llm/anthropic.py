@@ -7,11 +7,10 @@ from .client import LLMClient
 
 
 class ClaudeClient(LLMClient):
-    """Client Anthropic (Claude). Cle via ANTHROPIC_API_KEY.
+    """Anthropic Client (Claude). Key via ANTHROPIC_API_KEY.
 
-    Format d'appel different des autres (Messages API : system a part, pas de role
-    'system' dans `messages`), d'ou une implementation propre plutot qu'un copier-coller
-    de MistralClient.
+    Call format differs from others (Messages API: system is a separate field, no role
+    'system' in `messages`), hence a specific implementation rather than copying MistralClient.
     """
 
     nom = "claude"

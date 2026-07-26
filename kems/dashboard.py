@@ -1,7 +1,7 @@
-"""Dashboard quasi-direct : publie l'etat de la partie en JSON, servi en local.
+"""Live Dashboard: publishes the game state as JSON, served locally.
 
-Le moteur reste l'unique source de verite ; ce module ne fait que PROJETER son etat vers un
-fichier que la page web relit en boucle. Il n'influence jamais le jeu.
+The engine remains the sole source of truth; this module only projects its state to a
+file that the web page re-reads in a loop. It never influences the game.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import threading
 import time
 from datetime import datetime
 
-from .engine.cards import est_carre
+from .engine.cards import is_square
 from .engine.state import GameState
 
 DOSSIER = "dashboard"
@@ -23,57 +23,128 @@ FICHIER_TRANSCRIPT = "partie.txt"
 
 def _instantane(state: GameState, tokens: dict | None, en_cours: bool,
                 transcript: str | None = None) -> dict:
-    """Projette l'etat en dict serialisable. Les secrets sont marques comme tels."""
+    """Projects state to a serializable dict. Secrets are flagged as such."""
     return {
         "maj": datetime.now().isoformat(timespec="seconds"),
         "en_cours": en_cours,
         "transcript": transcript,
         "api_status": getattr(state, "api_status", {}),
         "seed": state.config.master_seed,
-        "rangs": state.config.nb_rangs,
-        "manche": state.manche,
-        "tour": state.tour,
+        "rangs": state.config.num_ranks,
+        "manche": state.round,
+        "tour": state.turn,
         "phase": state.phase,
         "scores": {str(e): n for e, n in state.scores.items()},
-        "vainqueur_match": state.vainqueur_match,
+        "vainqueur_match": state.match_winner,
         "joueurs": [
             {
-                "pid": p.pid, "nom": p.nom, "equipe": p.equipe, "modele": p.modele,
-                "carre": est_carre(state.hands.get(p.pid, [])),
+                "pid": p.pid, "nom": p.name, "equipe": p.team, "modele": p.model,
+                "carre": is_square(state.hands.get(p.pid, [])),
             }
             for p in state.players
         ],
         "chat": [
-            {"manche": ev.manche, "tour": ev.tour, "type": ev.type,
-             "pid": ev.pid, "texte": ev.texte}
+            {"manche": ev.round, "tour": ev.turn, "type": ev.type,
+             "pid": ev.pid, "texte": ev.text}
             for ev in state.public_log
         ],
-        # champs lourds (prompt + reponse brute de chaque decision) : reserves au transcript
-        # debug, inutiles a la page et couteux a reecrire 2x/s
-        "timeline": [{k: v for k, v in e.items() if k not in ("prompt_user", "reponse_brute")}
-                     for e in state.timeline],
+        "timeline": [
+            {
+                "i": item["i"],
+                "manche": item["round"],
+                "tour": item["turn"],
+                "phase": item["phase"],
+                "type": item["type"],
+                "pid": item["pid"],
+                "texte": item["text"],
+                "prive": item["private"],
+                "centre": item["center"],
+                "mains": item["hands"],
+                **{k: v for k, v in item.items() if k not in (
+                    "i", "round", "turn", "phase", "type", "pid", "text", "private", "center", "hands",
+                    "prompt_user", "reponse_brute"
+                )}
+            }
+            for item in state.timeline
+        ],
         "centre": [str(c) for c in state.center],
-        "episodes": list(state.episodes),
-        "appels_sans_signal": list(state.appels_sans_signal),
-        "emissions_sans_carre": list(state.emissions_sans_carre),
-        "manches": list(state.historique_manches),
+        "episodes": [
+            {
+                "manche": e.get("round"),
+                "pid": e.get("pid"),
+                "modele": e.get("model"),
+                "tour_carre": e.get("square_turn"),
+                "tour_signal": e.get("signal_turn"),
+                "tour_parole": e.get("speech_turn"),
+                "tour_signal_llm": e.get("llm_signal_turn"),
+                "tour_kemps": e.get("kemps_turn"),
+                "capte": e.get("caught"),
+                "demasque": e.get("unmasked"),
+            }
+            for e in state.episodes
+        ],
+        "appels_sans_signal": [
+            {
+                "manche": a.get("round"),
+                "tour": a.get("turn"),
+                "pid": a.get("pid"),
+                "modele": a.get("model"),
+                "gagnant": a.get("winner"),
+            }
+            for a in state.calls_without_signal
+        ],
+        "emissions_sans_carre": [
+            {
+                "manche": e.get("round"),
+                "tour": e.get("turn"),
+                "pid": e.get("pid"),
+                "modele": e.get("model"),
+            }
+            for e in state.emissions_without_square
+        ],
+        "manches": [
+            {
+                "manche": o.get("round"),
+                "winner_team": o.get("winner_team"),
+                "reason": o.get("reason"),
+                "caller": o.get("caller"),
+                "target": o.get("target"),
+                "kind": o.get("kind"),
+                "success": o.get("success"),
+                "signal_actually_emitted": o.get("signal_actually_emitted"),
+                "signal_actually_emitted_llm": o.get("signal_actually_emitted_llm"),
+                "riposte": {
+                    "equipe": o["riposte"].get("team"),
+                    "signal_adverse": o["riposte"].get("opposing_signal"),
+                    "tentatives": [
+                        {
+                            "pid": tt["pid"],
+                            "reponse": tt["response"],
+                            "trouve": tt["found"],
+                        }
+                        for tt in o["riposte"].get("attempts", [])
+                    ],
+                    "reussie": o["riposte"].get("success"),
+                } if o.get("riposte") else None
+            }
+            for o in state.round_history
+        ],
         "tokens": tokens or {"grand_total": 0, "per_model": {}},
-        # PRIVE : jamais vu par les agents, affiche seulement si l'observateur le demande
         "secrets": {
             "signaux": {str(e): s for e, s in state.signals.items()},
-            "declencheurs": {str(e): d for e, d in state.declencheurs.items()},
+            "declencheurs": {str(e): d for e, d in state.triggers.items()},
             "mains": {str(p.pid): [str(c) for c in state.hands.get(p.pid, [])]
                       for p in state.players},
-            "journaux": {str(pid): list(j) for pid, j in state.journaux.items()},
+            "journaux": {str(pid): list(j) for pid, j in state.journals.items()},
             "chats_equipe": {str(e): list(c) for e, c in state.team_channels.items()},
         },
     }
 
 
 class Publieur:
-    """Ecrit l'instantane a chaque evenement public. Ecriture atomique (rename)."""
+    """Writes the snapshot at each public event. Atomic write (rename)."""
 
-    INTERVALLE = 0.5        # s : l'instantane pese ~150 Ko, inutile de le reecrire plus souvent
+    INTERVALLE = 0.5        # s: snapshot weighs ~150 KB, useless to rewrite more often
 
     def __init__(self, dossier: str = DOSSIER, tokens=None):
         self.chemin = os.path.join(dossier, FICHIER)
@@ -83,13 +154,13 @@ class Publieur:
         os.makedirs(dossier, exist_ok=True)
 
     def rebrancher(self, tokens) -> None:
-        """Chaque partie a ses propres agents : on repointe le compteur de tokens."""
+        """Each game has its own agents: re-point token counter."""
         self._tokens = tokens
         self._derniere = 0.0
         self.transcript = None
 
     def deposer_transcript(self, texte: str, nom: str) -> None:
-        """Copie le recapitulatif a cote de la page pour qu'elle puisse l'offrir en telechargement."""
+        """Copies recap next to the page for download offer."""
         chemin = os.path.join(os.path.dirname(self.chemin), FICHIER_TRANSCRIPT)
         with open(chemin, "w", encoding="utf-8") as f:
             f.write(texte)
@@ -108,9 +179,9 @@ class Publieur:
         tmp = self.chemin + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(texte)
-        # os.replace est atomique, mais sous Windows il echoue si un autre processus tient le
-        # fichier (OneDrive, antivirus, le navigateur). On reessaie, puis on ecrit en direct :
-        # une lecture partielle fait juste echouer un JSON.parse, que la page reessaie 1 s plus tard.
+        # os.replace is atomic, but on Windows it fails if another process holds the
+        # file (OneDrive, antivirus, browser). We retry, then write directly:
+        # partial read just fails JSON.parse, which the page retries 1s later.
         for essai in range(5):
             try:
                 os.replace(tmp, self.chemin)
@@ -122,14 +193,11 @@ class Publieur:
                 f.write(texte)
             os.remove(tmp)
         except OSError:
-            pass                # le dashboard n'est qu'un observateur : il ne doit jamais casser la partie
+            pass                # dashboard is only observer: must never break the game
 
 
 class Pilote:
-    """Lance une partie en tache de fond a la demande du tableau de bord.
-
-    Une seule partie a la fois : deux parties concurrentes ecriraient dans le meme state.json.
-    """
+    """Launches a game in the background at dashboard request."""
 
     def __init__(self, publieur: "Publieur"):
         self.publieur = publieur
@@ -155,7 +223,7 @@ class Pilote:
             res = jouer_partie(reglages, self.publieur)
             if res.get("interrompu"):
                 self.erreur = f"Game Interrupted: {res['interrompu']}"
-        except Exception as e:                     # noqa: BLE001 — remonte tel quel a l'UI
+        except Exception as e:                     # noqa: BLE001
             self.erreur = f"{type(e).__name__} : {e}"
 
     def lancer_batch(self, reglages: dict) -> None:
@@ -226,15 +294,15 @@ class Pilote:
 
 
 class _Handler(http.server.SimpleHTTPRequestHandler):
-    """Fichiers statiques + une mini API pour piloter les parties."""
+    """Static files + mini API to drive games."""
 
     pilote: Pilote | None = None
 
     def log_message(self, *args):
-        pass                                       # les logs HTTP noieraient la sortie de la partie
+        pass                                       # HTTP logs would drown game output
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store")   # sinon le navigateur sert un state.json perime
+        self.send_header("Cache-Control", "no-store")   # else browser serves stale state.json
         super().end_headers()
 
     def _json(self, code: int, charge: dict) -> None:
@@ -274,7 +342,6 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
                     with open(summary_path, encoding="utf-8") as f:
                         data = json.load(f)
                     
-                    # Charger les codes depuis codes.csv
                     codes = []
                     if os.path.exists(codes_path):
                         with open(codes_path, encoding="utf-8") as f:
@@ -284,7 +351,6 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
                                 codes.append(row)
                     data["codes_inventes"] = codes
                     
-                    # Charger les tokens par partie depuis parties.csv
                     parties = []
                     if os.path.exists(parties_path):
                         with open(parties_path, encoding="utf-8") as f:
@@ -328,7 +394,7 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
 
 def demarrer_serveur(dossier: str = DOSSIER, port: int = 8000,
                      pilote: Pilote | None = None) -> str:
-    """Sert `dossier` en tache de fond et renvoie l'URL. Le thread meurt avec le programme."""
+    """Serves `dossier` in the background and returns URL."""
     os.makedirs(dossier, exist_ok=True)
     handler = functools.partial(_Handler, directory=dossier)
     _Handler.pilote = pilote

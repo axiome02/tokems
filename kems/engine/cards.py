@@ -2,26 +2,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-COULEURS = ["♠", "♥", "♦", "♣"]  # pique, coeur, carreau, trefle
+SUITS = ["♠", "♥", "♦", "♣"]  # spades, hearts, diamonds, clubs
 
 
 @dataclass(frozen=True)
 class Card:
-    rang: int          # 1..nb_rangs
-    couleur: str       # un des COULEURS
+    rank: int          # 1..num_ranks
+    suit: str       # one of SUITS
 
     def __str__(self) -> str:
-        return f"{self.rang}{self.couleur}"
+        return f"{self.rank}{self.suit}"
 
 
-def construire_paquet(nb_rangs: int) -> list[Card]:
-    return [Card(r, c) for r in range(1, nb_rangs + 1) for c in COULEURS]
+def build_deck(num_ranks: int) -> list[Card]:
+    return [Card(r, c) for r in range(1, num_ranks + 1) for c in SUITS]
 
 
-def est_carre(main: list[Card]) -> bool:
-    """Vrai si la main est un carre : 4 cartes du meme rang."""
-    return len(main) == 4 and len({c.rang for c in main}) == 1
+def is_square(hand: list[Card]) -> bool:
+    """True if the hand is a square: 4 cards of the same rank."""
+    return len(hand) == 4 and len({c.rank for c in hand}) == 1
 
 
-def rang_du_carre(main: list[Card]) -> int | None:
-    return main[0].rang if est_carre(main) else None
+def square_rank(hand: list[Card]) -> int | None:
+    return hand[0].rank if is_square(hand) else None

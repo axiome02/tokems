@@ -103,5 +103,9 @@ kems/
 ├── agents.py          LLMAgent layer translating views to prompts and parsing actions
 ├── orchestrator.py    The core game loop coordinator
 ├── transcript.py      Human-readable transcript renderer
+├── transcript_debug.py Detailed debug transcript renderer (prompts, raw responses)
+├── batch.py           Batch execution helper and metrics aggregator
+├── dashboard.py       Web dashboard backend server and API
+├── i18n.py            Internationalization translations dictionary
 └── run.py             Command Line Interface (CLI)
 ```

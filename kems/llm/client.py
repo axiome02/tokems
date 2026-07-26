@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 class LLMClient:
-    """Interface commune : chat(system, user) -> str. Compte les tokens et les appels."""
+    """Common interface: chat(system, user) -> str. Counts tokens and calls."""
 
     nom: str = "base"
 
@@ -14,5 +14,5 @@ class LLMClient:
         self.total_tokens = 0
 
     def chat(self, system: str, user: str, max_tokens: int | None = None) -> str:
-        """`max_tokens` plafonne la reponse pour CET appel (None = plafond par defaut du client)."""
+        """`max_tokens` limits the response length for THIS call (None = client's default limit)."""
         raise NotImplementedError

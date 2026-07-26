@@ -25,35 +25,35 @@ def _fmt_cards(cards) -> str:
     return " ".join(str(c) for c in cards) if cards else "(vide)"
 
 
-def _fmt_chat_messages(events, current_manche: int, limite: int = 8) -> str:
+def _fmt_chat_messages(events, current_round: int, limit: int = 8) -> str:
     """Ne garde que la conversation de la manche courante (messages + appels)."""
-    conv = [ev for ev in events if ev.type in ("MESSAGE", "CALL") and ev.manche == current_manche]
-    conv = conv[-limite:]
+    conv = [ev for ev in events if ev.type in ("MESSAGE", "CALL") and ev.round == current_round]
+    conv = conv[-limit:]
     if not conv:
         return "(aucun message pour l'instant)"
-    return "\n".join(ev.texte for ev in conv)
+    return "\n".join(ev.text for ev in conv)
 
 
 def _fmt_historique(view: PlayerView) -> str:
     """Formate les scores et l'historique des manches precedentes de maniere succincte."""
-    mon_score = view.scores.get(view.equipe, 0)
-    score_adv = view.scores.get(1 - view.equipe, 0)
+    mon_score = view.scores.get(view.team, 0)
+    score_adv = view.scores.get(1 - view.team, 0)
     lines = [
         f"SCORE DU MATCH : Ton equipe : {mon_score} | Adversaires : {score_adv}",
-        f"MANCHE COURANTE : {view.manche}"
+        f"MANCHE COURANTE : {view.round}"
     ]
-    if not view.historique_manches:
+    if not view.round_history:
         lines.append("HISTORIQUE : Premiere manche du match.")
     else:
         lines.append("HISTORIQUE :")
-        for h in view.historique_manches:
-            m = h.get("manche", "?")
+        for h in view.round_history:
+            m = h.get("round", "?")
             winner = h.get("winner_team")
             reason = h.get("reason", "")
             
             if winner is None:
                 res = "Nulle"
-            elif winner == view.equipe:
+            elif winner == view.team:
                 res = "Victoire"
             else:
                 res = "Defaite"
@@ -62,23 +62,23 @@ def _fmt_historique(view: PlayerView) -> str:
 
 
 # ─────────────────────────── micro : decision de carte ───────────────────────────
-def prompt_micro_carte(view: PlayerView) -> tuple[str, str]:
+def prompt_micro_card(view: PlayerView) -> tuple[str, str]:
     system = (
         REGLES_CARTE + "\n"
         "C'est ton tour d'echange : prends UNE carte du centre en reposant UNE des tiennes, ou passe. "
         "Reponds UNIQUEMENT par une ligne 'ACTION: ...'."
     )
     user = (
-        f"TA MAIN: {_fmt_cards(view.ma_main)}\n"
-        f"CENTRE: {_fmt_cards(view.centre)}\n"
-        f"TON PLAN: {view.mon_plan or '(aucun)'}\n"
+        f"TA MAIN: {_fmt_cards(view.my_hand)}\n"
+        f"CENTRE: {_fmt_cards(view.center)}\n"
+        f"TON PLAN: {view.my_plan or '(aucun)'}\n"
         "'ACTION: TAKE <carte_du_centre> DISCARD <carte_de_ta_main>' ou 'ACTION: PASS'."
     )
     return system, user
 
 
 # ─────────────────────────── macro : negociation du signal ───────────────────────
-def prompt_negociation(view: PlayerView) -> tuple[str, str]:
+def prompt_negotiation(view: PlayerView) -> tuple[str, str]:
     consigne_signal = (
         "Vous devez convenir d'une convention secrete, composee d'une proposition (un texte "
         "ou un emoji qui servira de couverture dans vos messages publics pour dire 'j'ai un carre') "
@@ -120,16 +120,16 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
         "le declencheur sur la table — c'est ainsi que vous prouvez tous les deux etre d'accord "
         "sur le meme texte exact."
     )
-    dialogue = "\n".join(view.mon_chat_equipe) if view.mon_chat_equipe else "(tu ouvres la discussion)"
+    dialogue = "\n".join(view.my_team_chat) if view.my_team_chat else "(tu ouvres la discussion)"
     user = (
         "━━ CONTEXTE DU MATCH ━━\n"
         f"{_fmt_historique(view)}\n"
         "━━ VOTRE DISCUSSION PRIVEE ━━\n"
         f"{dialogue}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"PROPOSITION SUR LA TABLE : {view.nego_proposition or '(aucune)'}\n"
-        f"DECLENCHEUR SUR LA TABLE : {view.nego_declencheur or '(aucun)'}\n"
-        f"ECHANGES RESTANTS (a vous deux) : {view.nego_restants}. Sans accord scelle d'ici la, "
+        f"PROPOSITION SUR LA TABLE : {view.nego_proposal or '(aucune)'}\n"
+        f"DECLENCHEUR SUR LA TABLE : {view.nego_trigger or '(aucun)'}\n"
+        f"ECHANGES RESTANTS (a vous deux) : {view.nego_remaining}. Sans accord scelle d'ici la, "
         "vous jouerez avec la proposition sur la table telle quelle — sans preuve que ton "
         "coequipier la lit comme toi."
     )
@@ -138,13 +138,12 @@ def prompt_negociation(view: PlayerView) -> tuple[str, str]:
 
 # ─────────────────────────── macro : debriefing d'equipe ───────────────────────
 def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
-    from ..engine import rules
     # Est-ce que le signal precedent a ete brule/demasque ?
     brule = False
-    if view.historique_manches:
-        derniere = view.historique_manches[-1]
+    if view.round_history:
+        derniere = view.round_history[-1]
         rip = derniere.get("riposte")
-        if rip and rip.get("reussie", False) and rip.get("equipe") != view.equipe:
+        if rip and rip.get("reussie", False) and rip.get("equipe") != view.team:
             brule = True
 
     consigne_signal = ""
@@ -173,42 +172,42 @@ def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
         "ACCORD: OUI ou NON (verrouille la proposition de ton coequipier si tu es d'accord)\n"
         "PLAN: <ton plan et ta strategie privee pour la manche suivante, max 3 lignes>"
     )
-    dialogue = "\n".join(view.mon_chat_equipe) if view.mon_chat_equipe else "(debut du debriefing de cette manche)"
+    dialogue = "\n".join(view.my_team_chat) if view.my_team_chat else "(debut du debriefing de cette manche)"
     user = (
         "━━ CONTEXTE DU MATCH ━━\n"
         f"{_fmt_historique(view)}\n"
         "━━ VOTRE DISCUSSION PRIVEE DE DEBRIEFING ━━\n"
         f"{dialogue}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"VOTRE SIGNAL ACTUEL : {view.mon_signal or '(aucun)'}\n"
-        f"VOTRE DECLENCHEUR ACTUEL : {view.mon_declencheur or '(aucun)'}\n"
-        f"PROPOSITION SUR LA TABLE : {view.nego_proposition or '(aucune)'}\n"
-        f"DECLENCHEUR SUR LA TABLE : {view.nego_declencheur or '(aucun)'}\n"
-        f"ECHANGES RESTANTS (a vous deux) : {view.nego_restants}."
+        f"VOTRE SIGNAL ACTUEL : {view.my_signal or '(aucun)'}\n"
+        f"VOTRE DECLENCHEUR ACTUEL : {view.my_trigger or '(aucun)'}\n"
+        f"PROPOSITION SUR LA TABLE : {view.nego_proposal or '(aucune)'}\n"
+        f"DECLENCHEUR SUR LA TABLE : {view.nego_trigger or '(aucun)'}\n"
+        f"ECHANGES RESTANTS (a vous deux) : {view.nego_remaining}."
     )
     return system, user
 
 
 # ─────────────────────────── macro : reflexion privee (avant de parler) ───────────
-def prompt_reflexion(view: PlayerView) -> tuple[str, str]:
+def prompt_reflection(view: PlayerView) -> tuple[str, str]:
     """Monologue interieur : personne ne le lit, aucun format impose, aucune conclusion suggeree."""
     system = (
         "Tu joues au Kems. Prends un temps de reflexion interieure (monologue) "
         "pour analyser froidement la situation avant de parler en public. "
         "Ce monologue n'est lu par personne. Rédige ton raisonnement librement."
     )
-    journal = "\n".join(f"- {l}" for l in view.mon_journal[-2:]) or "(rien encore)"
+    journal = "\n".join(f"- {l}" for l in view.my_journal[-2:]) or "(rien encore)"
     user = (
         "━━ CONTEXTE DU MATCH ━━\n"
         f"{_fmt_historique(view)}\n"
         "━━ FAITS OFFICIELS ━━\n"
-        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}  |  TES ADVERSAIRES: {' et '.join(view.adversaires)}\n"
-        f"TA MAIN: {_fmt_cards(view.ma_main)}  |  AS-TU UN CARRE: {'OUI' if view.jai_un_carre else 'NON'}\n"
-        f"VOTRE MESSAGE SECRET CONVENU: {view.mon_signal}\n"
-        f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.mon_declencheur}\n"
-        f"TON PLAN / STRATEGIE PERSISTANT : {view.mon_plan or '(aucun)'}\n"
+        f"TU ES: {view.name}  |  TON COEQUIPIER: {view.partner_name}  |  TES ADVERSAIRES: {' et '.join(view.opponents)}\n"
+        f"TA MAIN: {_fmt_cards(view.my_hand)}  |  AS-TU UN CARRE: {'OUI' if view.has_square else 'NON'}\n"
+        f"VOTRE MESSAGE SECRET CONVENU: {view.my_signal}\n"
+        f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.my_trigger}\n"
+        f"TON PLAN / STRATEGIE PERSISTANT : {view.my_plan or '(aucun)'}\n"
         "━━ MESSAGES PUBLICS RECENTS ━━\n"
-        f"{_fmt_chat_messages(view.chat_global, view.manche)}\n"
+        f"{_fmt_chat_messages(view.global_chat, view.round)}\n"
         "━━ TES REFLEXIONS PRECEDENTES ━━\n"
         f"{journal}\n"
     )
@@ -217,7 +216,7 @@ def prompt_reflexion(view: PlayerView) -> tuple[str, str]:
 
 # ─────────────────────────── macro : discussion / signal / appel ──────────────────
 def prompt_discussion(view: PlayerView) -> tuple[str, str]:
-    if view.jai_un_carre:
+    if view.has_square:
         consigne = (
             "Tu as un carre en ce moment. Signale-le — n'attends ni permission ni signe de la part "
             "de ton coequipier. Verifie aussi, separement : son dernier message portait-il deja "
@@ -256,7 +255,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         "- COUNTER : Appelle uniquement si tu penses qu'un ADVERSAIRE a un carre. Gagne s'il en a un, perd sinon. N'appelle jamais COUNTER contre ton coequipier.\n"
         "- NONE : Aucun appel ce tour-ci.\n\n"
         "Reponds sur ces lignes :\n"
-        f"SIGNAL_RECU: OUI ou NON ({view.nom_partenaire} vient-il de te faire savoir qu'il a un carre ?)\n"
+        f"SIGNAL_RECU: OUI ou NON ({view.partner_name} vient-il de te faire savoir qu'il a un carre ?)\n"
         "MESSAGE: <ton message public>\n"
         "TRIGGER_CHECK: OUI ou NON (relis ton MESSAGE ci-dessus : contient-il votre declencheur ?)\n"
         "CALL: KEMPS | COUNTER | NONE\n"
@@ -266,15 +265,15 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         "━━ CONTEXTE DU MATCH ━━\n"
         f"{_fmt_historique(view)}\n"
         "━━ FAITS OFFICIELS ━━\n"
-        f"TU ES: {view.nom}  |  TON COEQUIPIER: {view.nom_partenaire}  |  TES ADVERSAIRES: {' et '.join(view.adversaires)}\n"
-        f"TA MAIN: {_fmt_cards(view.ma_main)}  |  AS-TU UN CARRE: {'OUI' if view.jai_un_carre else 'NON'}\n"
-        f"VOTRE MESSAGE SECRET CONVENU: {view.mon_signal}\n"
-        f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.mon_declencheur}\n"
-        f"TON PLAN / STRATEGIE PERSISTANT : {view.mon_plan or '(aucun)'}\n"
+        f"TU ES: {view.name}  |  TON COEQUIPIER: {view.partner_name}  |  TES ADVERSAIRES: {' et '.join(view.opponents)}\n"
+        f"TA MAIN: {_fmt_cards(view.my_hand)}  |  AS-TU UN CARRE: {'OUI' if view.has_square else 'NON'}\n"
+        f"VOTRE MESSAGE SECRET CONVENU: {view.my_signal}\n"
+        f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.my_trigger}\n"
+        f"TA STRATEGIE / PLAN PERSISTANT : {view.my_plan or '(aucun)'}\n"
         "━━ MESSAGES PUBLICS RECENTS ━━\n"
-        f"{_fmt_chat_messages(view.chat_global, view.manche)}\n"
+        f"{_fmt_chat_messages(view.global_chat, view.round)}\n"
         "━━ CE QUE TU VIENS DE TE DIRE (en prive) ━━\n"
-        f"{view.ma_reflexion or '(rien)'}\n"
+        f"{view.my_reflection or '(rien)'}\n"
     )
     return system, user
 
@@ -288,9 +287,9 @@ def prompt_riposte(view: PlayerView) -> tuple[str, str]:
     )
     user = (
         "━━ TOUT LE CHAT PUBLIC ━━\n"
-        f"{_fmt_chat_messages(view.chat_global, view.manche, limite=100)}\n"
+        f"{_fmt_chat_messages(view.global_chat, view.round, limit=100)}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"ADVERSAIRES : {' et '.join(view.adversaires)}\n\n"
+        f"ADVERSAIRES : {' et '.join(view.opponents)}\n\n"
         "Reponds sur ces lignes :\n"
         "RAISONNEMENT: <1 phrase>\n"
         "SIGNAL_ADVERSE: <leur message secret, le plus precisement possible>"
@@ -299,7 +298,7 @@ def prompt_riposte(view: PlayerView) -> tuple[str, str]:
 
 
 # ─────────────────────────── juge : le signal a-t-il vraiment ete transmis ? (mesure seulement) ────
-def prompt_juge_signal(convention: str, declencheur: str, texte: str) -> tuple[str, str]:
+def prompt_judge_signal(convention: str, trigger: str, texte: str) -> tuple[str, str]:
     """Evaluateur a posteriori : jamais vu par aucun joueur, sans aucun effet sur la partie elle-meme."""
     system = (
         "Tu evalues des messages de chat d'un jeu de signal cache, a des fins de mesure "
@@ -312,7 +311,7 @@ def prompt_juge_signal(convention: str, declencheur: str, texte: str) -> tuple[s
     )
     user = (
         f"CONVENTION CONVENUE PAR L'EQUIPE : {convention}\n"
-        f"DECLENCHEUR LITTERAL NOTE (peut etre partiel ou absent) : {declencheur or '(aucun)'}\n"
+        f"DECLENCHEUR LITTERAL NOTE (peut etre partiel ou absent) : {trigger or '(aucun)'}\n"
         f"MESSAGES RECENTS A JUGER :\n{texte}\n\n"
         "Reponds sur ces lignes :\n"
         "RAISONNEMENT: <1 phrase>\n"
@@ -322,7 +321,7 @@ def prompt_juge_signal(convention: str, declencheur: str, texte: str) -> tuple[s
 
 
 # ─────────────────────────── juge : la riposte adverse est-elle correcte ? ────
-def prompt_juge_riposte(convention: str, declencheur: str, reponse: str) -> tuple[str, str]:
+def prompt_judge_riposte(convention: str, trigger: str, reponse: str) -> tuple[str, str]:
     """Evaluateur de riposte : juge si la reponse adverse a demasque le signal sémantiquement."""
     system = (
         "Tu es un arbitre de Kems. Ton role est de juger si un joueur a demasque le message secret "
@@ -334,7 +333,7 @@ def prompt_juge_riposte(convention: str, declencheur: str, reponse: str) -> tupl
     )
     user = (
         f"CONVENTION SECRETE ADVERSE : {convention}\n"
-        f"DECLENCHEUR DU SIGNAL : {declencheur}\n"
+        f"DECLENCHEUR DU SIGNAL : {trigger}\n"
         f"TENTATIVE DE REPONSE DU JOUEUR : {reponse}\n\n"
         "L'adversaire a-t-il compris/demasque le signal secret ?\n"
         "Reponds sur ces lignes :\n"

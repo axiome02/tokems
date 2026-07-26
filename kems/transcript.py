@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .engine.cards import est_carre, rang_du_carre
+from .engine.cards import is_square, square_rank
 from .engine.state import GameState
 from .i18n import t
 
@@ -11,110 +11,110 @@ def rendre(state: GameState, usage: dict | None = None) -> str:
     L.append("=" * 64)
     L.append(t(lang, "transcript_title"))
     L.append(t(lang, "transcript_header", seed=state.config.master_seed,
-                rangs=state.config.nb_rangs, points=state.config.points_pour_gagner))
+                rangs=state.config.num_ranks, points=state.config.points_to_win))
     L.append(t(lang, "players_label"))
     for p in state.players:
-        L.append(t(lang, "player_line", nom=p.nom, equipe=p.equipe, modele=p.modele))
+        L.append(t(lang, "player_line", nom=p.name, equipe=p.team, modele=p.model))
     L.append("=" * 64)
 
-    # --- chat global, groupe par manche puis par tour ---
+    # --- global chat, grouped by round then by turn ---
     tour_courant = None
     manche_courante = None
     for ev in state.public_log:
-        if ev.manche != manche_courante:
-            manche_courante = ev.manche
+        if ev.round != manche_courante:
+            manche_courante = ev.round
             tour_courant = None
-            L.append(f"\n{'━' * 64}\n{t(lang, 'manche_header', manche=ev.manche)}\n{'━' * 64}")
-        if ev.tour != tour_courant:
-            tour_courant = ev.tour
-            entete = t(lang, "negotiation_setup") if ev.tour == 0 else t(lang, "tour_header", tour=ev.tour)
+            L.append(f"\n{'━' * 64}\n{t(lang, 'manche_header', manche=ev.round)}\n{'━' * 64}")
+        if ev.turn != tour_courant:
+            tour_courant = ev.turn
+            entete = t(lang, "negotiation_setup") if ev.turn == 0 else t(lang, "tour_header", tour=ev.turn)
             L.append(f"\n── {entete} ──")
-        L.append(f"   {ev.texte}")
+        L.append(f"   {ev.text}")
 
-    # --- revelations de fin ---
+    # --- end revelations ---
     L.append("")
     L.append("=" * 64)
     L.append(t(lang, "revelations_title"))
-    for equipe in (0, 1):
-        L.append(f"\n  {t(lang, 'team_negotiation_label', equipe=equipe)}")
-        for ligne in state.team_channels.get(equipe, []):
-            L.append(f"      {ligne}")
-        L.append(f"  {t(lang, 'final_signal_label', equipe=equipe, signal=state.signals.get(equipe, ''))}")
+    for team in (0, 1):
+        L.append(f"\n  {t(lang, 'team_negotiation_label', equipe=team)}")
+        for line in state.team_channels.get(team, []):
+            L.append(f"      {line}")
+        L.append(f"  {t(lang, 'final_signal_label', equipe=team, signal=state.signals.get(team, ''))}")
     for p in state.players:
         h = state.hands[p.pid]
-        carre = t(lang, "carre_note", rang=rang_du_carre(h)) if est_carre(h) else ""
-        L.append(t(lang, "final_hand_label", nom=p.nom, main=" ".join(str(c) for c in h), carre=carre))
+        carre = t(lang, "carre_note", rang=square_rank(h)) if is_square(h) else ""
+        L.append(t(lang, "final_hand_label", nom=p.name, main=" ".join(str(c) for c in h), carre=carre))
 
     L.append("")
     L.append(f"  {t(lang, 'monologues_title')}")
     for p in state.players:
-        entrees = state.journaux.get(p.pid, [])
-        if not entrees:
+        entries = state.journals.get(p.pid, [])
+        if not entries:
             continue
-        L.append(f"\n    {t(lang, 'team_header', nom=p.nom, equipe=p.equipe)}")
-        for i, e in enumerate(entrees, 1):
-            L.append(f"      [{i}] " + "\n          ".join(e.splitlines()))
+        L.append(f"\n    {t(lang, 'team_header', nom=p.name, equipe=p.team)}")
+        for i, entry in enumerate(entries, 1):
+            L.append(f"      [{i}] " + "\n          ".join(entry.splitlines()))
 
     L.append("")
     L.append(f"  {t(lang, 'episodes_title')}")
     if not state.episodes:
         L.append(f"    {t(lang, 'no_square_formed')}")
     for e in state.episodes:
-        nom = state.players[e["pid"]].nom
-        if e["tour_signal"]:
-            emis = t(lang, "trigger_sent", tour=e["tour_signal"])
-        elif e["tour_parole"]:
-            emis = t(lang, "spoke_not_recognized", tour=e["tour_parole"])
+        name = state.players[e["pid"]].name
+        if e["signal_turn"]:
+            emis = t(lang, "trigger_sent", tour=e["signal_turn"])
+        elif e["speech_turn"]:
+            emis = t(lang, "spoke_not_recognized", tour=e["speech_turn"])
         else:
             emis = t(lang, "never_spoke")
-        if e.get("tour_signal_llm") and not e["tour_signal"]:
-            # le juge LLM (pure mesure) a compris un signal que la detection litterale a rate
-            emis += " " + t(lang, "llm_judge_caught_it", tour=e["tour_signal_llm"])
-        capte = t(lang, "caught_on", tour=e["tour_kemps"]) if e["capte"] else t(lang, "not_caught")
-        dem = "" if e["demasque"] is None else (
-            t(lang, "unmasked_by_opponent") if e["demasque"] else t(lang, "signal_stayed_secret"))
-        L.append("    " + t(lang, "episode_line", manche=e["manche"], nom=nom, modele=e["modele"],
-                             tour_carre=e["tour_carre"], emis=emis, capte=capte, dem=dem))
-    if state.appels_sans_signal:
+        if e.get("llm_signal_turn") and not e["signal_turn"]:
+            # LLM judge (pure measurement) understood a signal literal detection missed
+            emis += " " + t(lang, "llm_judge_caught_it", tour=e["llm_signal_turn"])
+        caught = t(lang, "caught_on", tour=e["kemps_turn"]) if e["caught"] else t(lang, "not_caught")
+        dem = "" if e["unmasked"] is None else (
+            t(lang, "unmasked_by_opponent") if e["unmasked"] else t(lang, "signal_stayed_secret"))
+        L.append("    " + t(lang, "episode_line", manche=e["round"], nom=name, modele=e["model"],
+                             tour_carre=e["square_turn"], emis=emis, capte=caught, dem=dem))
+    if state.calls_without_signal:
         L.append("")
         L.append(f"  {t(lang, 'calls_without_trigger_title')}")
-        for a in state.appels_sans_signal:
-            issue = t(lang, "winning_call") if a["gagnant"] else t(lang, "losing_call")
-            L.append("    " + t(lang, "call_without_trigger_line", manche=a["manche"], tour=a["tour"],
-                                 nom=state.players[a["pid"]].nom, modele=a["modele"], issue=issue))
-    if state.emissions_sans_carre:
+        for a in state.calls_without_signal:
+            issue = t(lang, "winning_call") if a["winner"] else t(lang, "losing_call")
+            L.append("    " + t(lang, "call_without_trigger_line", manche=a["round"], tour=a["turn"],
+                                 nom=state.players[a["pid"]].name, modele=a["model"], issue=issue))
+    if state.emissions_without_square:
         L.append("")
         L.append(f"  {t(lang, 'code_without_square_title')}")
-        for e in state.emissions_sans_carre:
-            L.append("    " + t(lang, "code_without_square_line", manche=e["manche"], tour=e["tour"],
-                                 nom=state.players[e["pid"]].nom, modele=e["modele"]))
+        for e in state.emissions_without_square:
+            L.append("    " + t(lang, "code_without_square_line", manche=e["round"], tour=e["turn"],
+                                 nom=state.players[e["pid"]].name, modele=e["model"]))
 
     L.append("")
     L.append(f"  {t(lang, 'match_progress_title')}")
-    for o in state.historique_manches:
+    for o in state.round_history:
         w = o.get("winner_team")
         qui = t(lang, "draw_word") if w is None else t(lang, "team_word", equipe=w)
-        L.append("    " + t(lang, "manche_result_line", manche=o.get("manche", "?"), qui=qui,
+        L.append("    " + t(lang, "manche_result_line", manche=o.get("round", "?"), qui=qui,
                              reason=o.get("reason", "?")))
         r = o.get("riposte")
         if r:
-            L.append("        " + t(lang, "riposte_recap", equipe=r["equipe"],
-                                     signal=r["signal_adverse"]))
-            for tt in r["tentatives"]:
-                verdict = t(lang, "unmasked_word") if tt["trouve"] else t(lang, "wrong_word")
-                L.append("          " + t(lang, "attempt_line", nom=state.players[tt["pid"]].nom,
-                                           reponse=tt["reponse"], verdict=verdict))
+            L.append("        " + t(lang, "riposte_recap", equipe=r["team"],
+                                     signal=r["opposing_signal"]))
+            for tt in r["attempts"]:
+                verdict = t(lang, "unmasked_word") if tt["found"] else t(lang, "wrong_word")
+                L.append("          " + t(lang, "attempt_line", nom=state.players[tt["pid"]].name,
+                                           reponse=tt["response"], verdict=verdict))
 
     L.append("-" * 64)
     L.append(f"  {t(lang, 'final_score', s0=state.scores[0], s1=state.scores[1])}")
-    if state.vainqueur_match is None:
+    if state.match_winner is None:
         L.append(f"  {t(lang, 'match_draw')}")
     else:
-        L.append(f"  {t(lang, 'match_winner', equipe=state.vainqueur_match)}")
-    L.append(f"  {t(lang, 'rounds_turns_summary', n_manches=len(state.historique_manches), n_tours=state.tour)}")
+        L.append(f"  {t(lang, 'match_winner', equipe=state.match_winner)}")
+    L.append(f"  {t(lang, 'rounds_turns_summary', n_manches=len(state.round_history), n_tours=state.turn)}")
     if usage is not None:
         per = " | ".join(f"{n}: {d['total']} tok ({d['calls']} appels)"
-                         for n, d in usage["per_model"].items())
+                          for n, d in usage["per_model"].items())
         L.append(f"  {t(lang, 'tokens_total', total=usage['grand_total'])}" + (f"  [{per}]" if per else ""))
     L.append("=" * 64)
     return "\n".join(L)

@@ -50,7 +50,7 @@ CLIENTS = {
 
 
 def build_agent(kind: str, model: str | None = None, pause: float | None = None,
-                temperature: float | None = None, lang: str = "en") -> LLMAgent:
+                 temperature: float | None = None, lang: str = "en") -> LLMAgent:
     try:
         classe = CLIENTS[kind]
     except KeyError:
@@ -68,15 +68,14 @@ def build_agent(kind: str, model: str | None = None, pause: float | None = None,
 
 
 class Capteur:
-    """Diffuse chaque evenement aux observateurs ET retient l'etat.
+    """Broadcasts each event to observers AND retains state.
 
-    Sans lui, une exception dans `play_game` emporte le `GameState` avec elle : on perdrait
-    le transcript d'une partie deja payee en tokens.
+    Without it, an exception in `play_game` would lose the `GameState` and the transcript.
     """
 
-    def __init__(self, *observateurs):
+    def __init__(self, *observers):
         self.state = None
-        self._obs = observateurs
+        self._obs = observers
 
     def __call__(self, ev, state):
         self.state = state
@@ -87,29 +86,25 @@ class Capteur:
 
 
 class LivePrinter:
-    """Affiche le chat global en direct, groupe par tour, facon transcript."""
+    """Prints the global chat live in terminal, grouped by turn."""
 
     def __init__(self, delay: float = 0.0):
-        self._tour = None
+        self._turn = None
         self._delay = delay
 
     def __call__(self, ev, state=None):
-        if ev.tour != self._tour:
-            self._tour = ev.tour
+        if ev.turn != self._turn:
+            self._turn = ev.turn
             lang = state.config.lang if state is not None else "en"
-            entete = t(lang, "negotiation_setup") if ev.tour == 0 else t(lang, "tour_header", tour=ev.tour)
+            entete = t(lang, "negotiation_setup") if ev.turn == 0 else t(lang, "tour_header", tour=ev.turn)
             print(f"\n── {entete} ──")
-        print(f"   {ev.texte}")
+        print(f"   {ev.text}")
         if self._delay:
             time.sleep(self._delay)
 
 
 def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
-    """Joue une partie decrite par un dict de reglages. Utilise par le CLI ET par le dashboard.
-
-    `reglages["joueurs"]` : une entree par joueur, {agent, model, temperature}.
-    Renvoie un resume ; ecrit toujours les transcripts, meme si la partie est interrompue.
-    """
+    """Plays a game described by a settings dict. Used by both CLI and dashboard."""
     load_env()
     joueurs = reglages.get("joueurs") or [{"agent": "mistral"} for _ in range(4)]
     kinds = [j.get("agent", "mistral") for j in joueurs]
@@ -117,29 +112,29 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
     lang = reglages.get("lang") or "en"
     config = Config(
         master_seed=int(reglages.get("seed", 42)),
-        nb_rangs=int(reglages.get("nb_rangs", 10)),
-        nb_joueurs=len(kinds),
+        num_ranks=int(reglages.get("nb_rangs", 10)),
+        num_players=len(kinds),
         lang=lang,
     )
     for cle, attr in (
-        ("max_tours", "max_tours"),
-        ("max_centres", "max_centres_par_partie"),
-        ("points", "points_pour_gagner"),
-        ("max_manches", "max_manches"),
+        ("max_tours", "max_turns"),
+        ("max_centres", "max_centers_per_round"),
+        ("points", "points_to_win"),
+        ("max_manches", "max_rounds"),
         ("seed_cards", "seed_cards"),
         ("seed_order", "seed_order"),
-        ("taille_main", "taille_main"),
-        ("taille_centre", "taille_centre"),
-        ("max_sous_tours_par_centre", "max_sous_tours_par_centre"),
-        ("max_tours_negociation", "max_tours_negociation"),
-        ("tours_discussion", "tours_discussion"),
-        ("fenetre_chat", "fenetre_chat"),
+        ("taille_main", "hand_size"),
+        ("taille_centre", "center_size"),
+        ("max_sous_tours_par_centre", "max_subturns_per_center"),
+        ("max_tours_negociation", "max_negotiation_turns"),
+        ("tours_discussion", "discussion_turns"),
+        ("fenetre_chat", "chat_window"),
     ):
         if reglages.get(cle) is not None:
             setattr(config, attr, int(reglages[cle]))
 
     if "evaluer_signaux" in reglages:
-        config.evaluer_signaux = bool(reglages["evaluer_signaux"])
+        config.eval_signals = bool(reglages["evaluer_signaux"])
 
     pause = reglages.get("pause")
     agents = {
@@ -151,7 +146,7 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
     eval_agent = reglages.get("eval_agent")
     eval_model = reglages.get("eval_model")
     if not eval_agent:
-        config.evaluer_signaux = False
+        config.eval_signals = False
     else:
         agents["evaluateur"] = build_agent(eval_agent, eval_model, pause, None, lang)
     if publieur is not None:
@@ -167,7 +162,6 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
     try:
         state = play_game(config, kinds, agents, on_event=capteur)
     except (RuntimeError, KeyboardInterrupt) as e:
-        # une coupure API ne doit pas jeter les appels deja payes : on sauve ce qui existe
         interrompu, state = e, capteur.state
         print(f"\n[game interrupted] {e}\n")
         if state is None:
@@ -183,9 +177,8 @@ def jouer_partie(reglages: dict, publieur=None, printer=None) -> dict:
         f.write(rendre_debug(state, usage))
 
     if publieur is not None:
-        # une copie a cote du dashboard : la page peut alors l'offrir en telechargement
         publieur.deposer_transcript(texte, os.path.basename(out))
-        publieur.ecrire(state, en_cours=False)   # publie APRES, pour que le lien soit pret
+        publieur.ecrire(state, en_cours=False)
     return {"state": state, "usage": usage, "out": out,
             "out_debug": out_debug, "interrompu": interrompu}
 
@@ -196,16 +189,12 @@ def main() -> None:
     ap.add_argument("--agents", type=str, default="mistral,mistral,mistral,mistral",
                     help="comma-separated list among: " + ", ".join(repr(k) for k in CLIENTS))
     ap.add_argument("--lang", type=str, default="en", choices=["en", "fr"],
-                    help="game language: LLM prompts + public events + transcript. "
-                         "Default 'en'. 'fr' hasn't been recalibrated since multilingual support "
-                         "was added (2026-07-22), reference measurements remain in French.")
+                    help="game language: LLM prompts + public events + transcript. Default 'en'.")
     ap.add_argument("--nb-rangs", type=int, default=10)
     ap.add_argument("--points", type=int, default=None,
                     help="round wins needed to win the match")
     ap.add_argument("--max-manches", type=int, default=None,
-                    help="maximum number of rounds (1 = a single round, even if it's a draw). "
-                         "Warning: a drawn round scores no point, so --points alone does NOT "
-                         "prevent rounds from chaining.")
+                    help="maximum number of rounds (1 = a single round, even if it's a draw).")
     ap.add_argument("--max-tours", type=int, default=None)
     ap.add_argument("--max-centres", type=int, default=None)
     ap.add_argument("--out", type=str, default=None)
@@ -219,12 +208,7 @@ def main() -> None:
     ap.add_argument("--seed-cards", type=int, default=None, help="shuffle seed (default: derived from --seed)")
     ap.add_argument("--seed-order", type=int, default=None, help="play-order seed (default: derived)")
     ap.add_argument("--model", type=str, default=None,
-                    help="model to use, applied to ALL players regardless of their "
-                         "provider (no per-provider setting in the CLI; use jouer_partie() "
-                         "or the dashboard for a different model per player). Default per "
-                         "provider if omitted: mistral-small-latest, gemini-flash-lite-latest, "
-                         "gpt-4o-mini, claude-haiku-4-5-20251001, moonshot-v1-8k. Warning: "
-                         "larger models have much tighter free quotas.")
+                    help="model to use, applied to ALL players regardless of their provider.")
     ap.add_argument("--pause", type=float, default=None,
                     help="pause (s) between two API calls. Increase on HTTP 429 (e.g. 2)")
     ap.add_argument("--no-eval", action="store_false", dest="eval",
@@ -235,13 +219,12 @@ def main() -> None:
                     help="specific model for the evaluator")
     args = ap.parse_args()
 
-    # sortie UTF-8 pour afficher les symboles de cartes sans planter la console Windows
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
-    load_env()  # charge .env (cles API) si present
+    load_env()
 
     kinds = [k.strip() for k in args.agents.split(",")]
     publieur = None
@@ -278,11 +261,11 @@ def main() -> None:
 
     state, usage = res["state"], res["usage"]
     out, out_debug, interrompu = res["out"], res["out_debug"], res["interrompu"]
-    w = state.vainqueur_match
-    res = "draw" if w is None else f"team {w}"
-    entete = "GAME INTERRUPTED (partial state saved)" if interrompu else f"Match finished -> {res}"
+    w = state.match_winner
+    res_str = "draw" if w is None else f"team {w}"
+    entete = "GAME INTERRUPTED (partial state saved)" if interrompu else f"Match finished -> {res_str}"
     print(f"{entete} | score {state.scores[0]}-{state.scores[1]} "
-          f"| {len(state.historique_manches)} rounds | {state.tour} turns")
+          f"| {len(state.round_history)} rounds | {state.turn} turns")
     print(f"Total tokens: {usage['grand_total']}")
     print(f"Transcript      : {out}")
     print(f"Debug transcript: {out_debug}")

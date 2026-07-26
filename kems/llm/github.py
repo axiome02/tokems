@@ -7,7 +7,7 @@ from .client import LLMClient
 
 
 class GithubModelsClient(LLMClient):
-    """Client pour GitHub Models (Inférence gratuite). Clé via GITHUB_TOKEN."""
+    """Client for GitHub Models (Free Inference). Key via GITHUB_TOKEN."""
 
     nom = "github"
     URL = "https://models.github.ai/inference/chat/completions"

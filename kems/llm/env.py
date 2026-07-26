@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def load_env(path: str = ".env") -> None:
-    """Charge un fichier .env (KEY=VALUE) dans os.environ, sans ecraser les vraies variables."""
+    """Loads a .env file (KEY=VALUE) into os.environ, without overwriting existing variables."""
     p = Path(path)
     if not p.exists():
         return

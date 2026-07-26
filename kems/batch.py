@@ -1,16 +1,10 @@
-"""Collecte de data : lance N parties (multi-seeds) et agrege les mesures du livrable.
+"""Data collection: launches N games (multi-seeds) and aggregates the metrics.
 
-Cette couche ne touche NI au moteur NI aux LLM : elle se contente de rejouer `jouer_partie`
-et de lire le `GameState` final (episodes, historique des manches, appels, ripostes...).
+This layer does not touch the engine or LLMs: it only replays `jouer_partie` and reads the final
+`GameState` (episodes, round history, calls, comebacks...).
 
-Ecriture crash-safe et reprenable : chaque partie est dumpee dans `results/games/<seed>.json`
-des qu'elle finit. Un 429 au seed 30/50 ne perd pas les 29 precedentes ; relancer complete
-(les seeds deja presents sont sautes). Les CSV + le resume sont regeneres depuis ces dumps.
-
-⚠️ Fidele au CLAUDE.md : un episode n'est PAS reduit a un booleen « transmis oui/non ». Le
-moteur est aveugle aux paraphrases, donc `tour_signal` (reconnaissance mot pour mot) est un
-MINORANT. On remonte les 3 etats distincts (reconnu / parle sans reconnaissance / jamais parle)
-sous peine de produire des chiffres faux avec l'air d'etre justes.
+Crash-safe and resumable: each game is dumped to `results/games/<seed>.json` as soon as it finishes.
+CSV files + summary are regenerated from these dumps.
 """
 from __future__ import annotations
 
@@ -23,65 +17,62 @@ RESULTS_DIR = "results"
 GAMES_DIR = os.path.join(RESULTS_DIR, "games")
 
 
-# --- classification des episodes (le coeur de l'honnetete des chiffres) -----------------
+# --- episode classification -----------------------------------------------------------
 
-RECONNU = "reconnu"                            # declencheur repere MOT POUR MOT
-PARLE_SANS_RECONNAISSANCE = "parle_sans_reconnaissance"  # a parle avec un carre, mais paraphrase
-JAMAIS_PARLE = "jamais_parle"                  # vraiment reste muet
-
-
-def etat_episode(e: dict) -> str:
-    """Range un episode dans l'un des 3 etats. Voir l'avertissement en tete de module."""
-    if e.get("tour_signal") is not None:
-        return RECONNU
-    if e.get("tour_parole") is not None:
-        return PARLE_SANS_RECONNAISSANCE
-    return JAMAIS_PARLE
+RECOGNIZED = "recognized"                                   # trigger spotted WORD FOR WORD
+SPOKE_WITHOUT_RECOGNITION = "spoke_without_recognition"    # spoke with square, but paraphrased
+NEVER_SPOKE = "never_spoke"                                # stayed completely silent
 
 
-# --- extraction : GameState -> enregistrements plats ------------------------------------
+def episode_state(e: dict) -> str:
+    """Classifies an episode into one of the 3 states."""
+    if e.get("signal_turn") is not None:
+        return RECOGNIZED
+    if e.get("speech_turn") is not None:
+        return SPOKE_WITHOUT_RECOGNITION
+    return NEVER_SPOKE
 
-def _modele_equipe(state, equipe: int) -> str:
-    modeles = sorted({state.players[p].modele for p in state.joueurs_equipe(equipe)})
-    return " + ".join(modeles)
+
+# --- extraction: GameState -> flat records ---------------------------------------------
+
+def _team_model(state, team: int) -> str:
+    models = sorted({state.players[p].model for p in state.team_players(team)})
+    return " + ".join(models)
 
 
 def extraire_episodes(state, seed: int) -> list[dict]:
-    """Une ligne par episode de signalisation (maille du produit)."""
+    """One row per signaling episode."""
     lignes = []
     for e in state.episodes:
         lignes.append({
             "seed": seed,
-            "manche": e.get("manche"),
+            "manche": e.get("round"),
             "pid": e.get("pid"),
-            "modele": e.get("modele"),
-            "etat": etat_episode(e),
-            "tour_carre": e.get("tour_carre"),
-            "tour_parole": e.get("tour_parole"),
-            "tour_signal": e.get("tour_signal"),
-            "tour_kemps": e.get("tour_kemps"),
-            "capte": bool(e.get("capte")),
-            # None = pas de riposte ouverte ; True/False = signal demasque ou non
-            "demasque": e.get("demasque"),
+            "modele": e.get("model"),
+            "etat": episode_state(e),
+            "tour_carre": e.get("square_turn"),
+            "tour_parole": e.get("speech_turn"),
+            "tour_signal": e.get("signal_turn"),
+            "tour_kemps": e.get("kemps_turn"),
+            "capte": bool(e.get("caught")),
+            "demasque": e.get("unmasked"),
         })
     return lignes
 
 
 def extraire_partie(state, usage: dict, seed: int) -> dict:
-    """Une ligne par partie."""
-    ripostes = [m["riposte"] for m in state.historique_manches if m.get("riposte")]
-    appels_aveugles = state.appels_sans_signal
+    """One row per game."""
+    ripostes = [m["riposte"] for m in state.round_history if m.get("riposte")]
+    appels_aveugles = state.calls_without_signal
     return {
         "seed": seed,
-        "modele_equipe_0": _modele_equipe(state, 0),
-        "modele_equipe_1": _modele_equipe(state, 1),
-        "vainqueur": state.vainqueur_match,       # None = match nul
+        "modele_equipe_0": _team_model(state, 0),
+        "modele_equipe_1": _team_model(state, 1),
+        "vainqueur": state.match_winner,       # None = draw
         "score_0": state.scores[0],
         "score_1": state.scores[1],
-        "nb_manches": len(state.historique_manches),
-        "nb_tours": state.tour,
-        # scellage notarie : True = accord prouve (read-back), False = fige au plafond sans
-        # convergence. Reflete la DERNIERE negociation de l'equipe (renegociation comprise).
+        "nb_manches": len(state.round_history),
+        "nb_tours": state.turn,
         "nego_convergence_0": state.nego_convergence.get(0),
         "nego_convergence_1": state.nego_convergence.get(1),
         "tokens_total": usage.get("grand_total", 0),
@@ -89,41 +80,39 @@ def extraire_partie(state, usage: dict, seed: int) -> dict:
         "tokens_prompt": usage.get("prompt_total", 0),
         "tokens_completion": usage.get("completion_total", 0),
         "nb_episodes": len(state.episodes),
-        # paris a l'aveugle : KEMPS crie sans qu'aucun declencheur n'ait ete repere (voir CLAUDE.md,
-        # ce compteur herite de la cecite aux paraphrases : « aucun detecte » != « aucun emis »)
         "appels_sans_signal": len(appels_aveugles),
-        "appels_sans_signal_gagnants": sum(1 for a in appels_aveugles if a.get("gagnant")),
-        "emissions_sans_carre": len(state.emissions_sans_carre),
+        "appels_sans_signal_gagnants": sum(1 for a in appels_aveugles if a.get("winner")),
+        "emissions_sans_carre": len(state.emissions_without_square),
         "nb_ripostes": len(ripostes),
-        "ripostes_reussies": sum(1 for r in ripostes if r.get("reussie")),
+        "ripostes_reussies": sum(1 for r in ripostes if r.get("success")),
     }
 
 
 def extraire_codes(state, seed: int) -> list[dict]:
-    """Les signaux inventes par chaque equipe (la galerie du post)."""
+    """Signals invented by each team."""
     lignes = []
-    for equipe in (0, 1):
-        signal = state.signals.get(equipe, "")
+    for team in (0, 1):
+        signal = state.signals.get(team, "")
         if not signal:
             continue
-        # Verifie si le signal de cette equipe a ete demasque au cours du match
+        # Check if the team's signal was unmasked during the match
         busted = any(
-            m.get("riposte") and m["riposte"].get("reussie") and m["riposte"].get("equipe") == 1 - equipe
-            for m in state.historique_manches
+            m.get("riposte") and m["riposte"].get("success") and m["riposte"].get("team") == 1 - team
+            for m in state.round_history
         )
         lignes.append({
             "seed": seed,
-            "equipe": equipe,
-            "modele": _modele_equipe(state, equipe),
+            "equipe": team,
+            "modele": _team_model(state, team),
             "signal": signal,
-            "declencheur": state.declencheurs.get(equipe, ""),
+            "declencheur": state.triggers.get(team, ""),
             "busted": busted,
         })
     return lignes
 
 
 def extraire_tout(state, usage: dict, seed: int, interrompu: bool = False) -> dict:
-    """Le dump complet d'une partie, tel qu'ecrit dans results/games/<seed>.json."""
+    """Full dump of a game, written to results/games/<seed>.json."""
     return {
         "seed": seed,
         "interrompu": interrompu,
@@ -133,35 +122,35 @@ def extraire_tout(state, usage: dict, seed: int, interrompu: bool = False) -> di
     }
 
 
-# --- agregation : dumps -> les 2-3 metriques du livrable --------------------------------
+# --- aggregation: dumps -> metrics ----------------------------------------------------
 
 def _taux(n: int, d: int) -> float | None:
     return round(n / d, 4) if d else None
 
 
 def agreger(dumps: list[dict]) -> dict:
-    """Calcule les metriques publiables. Remonte TOUJOURS les 3 etats, jamais un seul booleen."""
+    """Calculates publishable metrics."""
     episodes = [ep for d in dumps for ep in d["episodes"]]
     parties = [d["partie"] for d in dumps]
 
-    etats = {RECONNU: 0, PARLE_SANS_RECONNAISSANCE: 0, JAMAIS_PARLE: 0}
+    etats = {RECOGNIZED: 0, SPOKE_WITHOUT_RECOGNITION: 0, NEVER_SPOKE: 0}
     for ep in episodes:
         etats[ep["etat"]] += 1
     n_ep = len(episodes)
 
-    # ripostes : le taux de detection adverse (metrique produit n°2)
+    # comebacks
     n_ripostes = sum(p["nb_ripostes"] for p in parties)
     n_ripostes_ok = sum(p["ripostes_reussies"] for p in parties)
 
-    # par modele porteur du carre (prepare le duel de fournisseurs quand Gemini sera branche)
+    # by model holding the square
     par_modele: dict[str, dict] = {}
     for ep in episodes:
-        d = par_modele.setdefault(ep["modele"], dict(etats={RECONNU: 0,
-                                  PARLE_SANS_RECONNAISSANCE: 0, JAMAIS_PARLE: 0}, total=0))
+        d = par_modele.setdefault(ep["modele"], dict(etats={RECOGNIZED: 0,
+                                   SPOKE_WITHOUT_RECOGNITION: 0, NEVER_SPOKE: 0}, total=0))
         d["etats"][ep["etat"]] += 1
         d["total"] += 1
 
-    # taux de detection adverse par modele (rebuttal rate)
+    # unmasking rate by model (rebuttal rate)
     det_par_modele = {}
     for ep in episodes:
         if ep.get("demasque") is not None:
@@ -171,7 +160,7 @@ def agreger(dumps: list[dict]) -> dict:
             if ep["demasque"]:
                 d["reussies"] += 1
 
-    # entonnoir de signalisation
+    # signaling funnel
     funnel = [
         {"label": "Four-of-a-kind formed", "n": n_ep},
         {"label": "Spoke (holding it)", "n": sum(1 for ep in episodes if ep.get("tour_parole") is not None)},
@@ -187,9 +176,8 @@ def agreger(dumps: list[dict]) -> dict:
         "tokens_cached": sum(p.get("tokens_cached", 0) for p in parties),
         "tokens_prompt": sum(p.get("tokens_prompt", 0) for p in parties),
         "tokens_completion": sum(p.get("tokens_completion", 0) for p in parties),
-        # ⚠️ tour_signal est un MINORANT : on donne la borne basse ET la borne haute, jamais un seul chiffre.
-        "transmission_minorant": _taux(etats[RECONNU], n_ep),
-        "transmission_borne_haute": _taux(etats[RECONNU] + etats[PARLE_SANS_RECONNAISSANCE], n_ep),
+        "transmission_minorant": _taux(etats[RECOGNIZED], n_ep),
+        "transmission_borne_haute": _taux(etats[RECOGNIZED] + etats[SPOKE_WITHOUT_RECOGNITION], n_ep),
         "etats_episodes": etats,
         "detection_adverse": _taux(n_ripostes_ok, n_ripostes),
         "nb_ripostes": n_ripostes,
@@ -197,9 +185,9 @@ def agreger(dumps: list[dict]) -> dict:
         "emissions_sans_carre": sum(p["emissions_sans_carre"] for p in parties),
         "par_modele": {
             m: {"total": d["total"],
-                "transmission_minorant": _taux(d["etats"][RECONNU], d["total"]),
+                "transmission_minorant": _taux(d["etats"][RECOGNIZED], d["total"]),
                 "transmission_borne_haute": _taux(
-                    d["etats"][RECONNU] + d["etats"][PARLE_SANS_RECONNAISSANCE], d["total"]),
+                    d["etats"][RECOGNIZED] + d["etats"][SPOKE_WITHOUT_RECOGNITION], d["total"]),
                 "etats": d["etats"]}
             for m, d in par_modele.items()
         },
@@ -216,11 +204,10 @@ def agreger(dumps: list[dict]) -> dict:
     }
 
 
-# --- ecriture : CSV + JSON --------------------------------------------------------------
+# --- write CSV + JSON ------------------------------------------------------------------
 
 def _ecrire_csv(chemin: str, lignes: list[dict]) -> None:
     if not lignes:
-        # un fichier a en-tete vide reste plus honnete qu'un fichier absent
         open(chemin, "w", encoding="utf-8").close()
         return
     with open(chemin, "w", encoding="utf-8", newline="") as f:
@@ -241,10 +228,7 @@ def _charger_dumps(games_dir: str = GAMES_DIR) -> list[dict]:
 
 
 def regenerer(results_dir: str = RESULTS_DIR) -> dict:
-    """Reconstruit parties.csv + episodes.csv + codes.csv + summary.json depuis les dumps.
-
-    Idempotent : rejouable a tout moment, y compris apres un batch interrompu.
-    """
+    """Rebuilds parties.csv + episodes.csv + codes.csv + summary.json from dumps."""
     os.makedirs(results_dir, exist_ok=True)
     dumps = _charger_dumps(os.path.join(results_dir, "games"))
     _ecrire_csv(os.path.join(results_dir, "parties.csv"), [d["partie"] for d in dumps])
@@ -258,12 +242,11 @@ def regenerer(results_dir: str = RESULTS_DIR) -> dict:
     return resume
 
 
-# --- le runner --------------------------------------------------------------------------
+# --- batch runner ----------------------------------------------------------------------
 
 def lancer_batch(seeds: list[int], reglages_base: dict, results_dir: str = RESULTS_DIR,
                  forcer: bool = False) -> dict:
-    """Joue chaque seed, dumpe crash-safe, saute ceux deja faits, puis regenere les agregats."""
-    # import tardif : garde `batch` importable (et testable) sans la couche LLM/reseau
+    """Plays each seed, dumps crash-safe, skips already done, and generates aggregates."""
     from .run import jouer_partie
 
     games_dir = os.path.join(results_dir, "games")

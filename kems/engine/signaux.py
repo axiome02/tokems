@@ -3,49 +3,48 @@ from __future__ import annotations
 import re
 import unicodedata
 
-# selecteurs de variante / jointures emoji : "☀️" et "☀" doivent etre le meme signe
+# variation selectors / emoji joins: "☀️" and "☀" must be normalized to the same sign
 _INVISIBLES = "️︎‍​"
 
-# valeur posee par l'orchestrateur quand une equipe n'a convenu d'aucun signal
-AUCUN_SIGNAL = "<aucun>"
+# value set by the orchestrator when a team has not agreed on any signal
+NO_SIGNAL = "<none>"
 
 
-def normaliser(texte: str) -> str:
-    """Forme canonique d'un signal : minuscules, sans accents, sans ponctuation, espaces tasses.
+def normalize(text: str) -> str:
+    """Canonical form of a signal: lowercase, no accents, no punctuation, normalized spaces.
 
-    Les emojis sont conserves tels quels (seuls les selecteurs de variante sont retires).
+    Emojis are preserved as is (only variation selectors are removed).
     """
-    s = unicodedata.normalize("NFKD", texte or "")
+    s = unicodedata.normalize("NFKD", text or "")
     s = "".join(c for c in s if not unicodedata.combining(c) and c not in _INVISIBLES)
     s = s.lower()
-    # on garde lettres, chiffres et symboles (les emojis sont des symboles) ; toute
-    # ponctuation devient un espace, y compris typographique (« » ’ …)
+    # keep letters, numbers, and symbols (emojis are symbols); punctuation becomes space
     s = "".join(c if unicodedata.category(c)[0] in "LNS" else " " for c in s)
     return re.sub(r"\s+", " ", s).strip()
 
 
-def _contient(aiguille: str, botte: str) -> bool:
-    """`aiguille` apparait dans `botte` en respectant les frontieres de mot."""
-    if not aiguille:
+def _contains(needle: str, haystack: str) -> bool:
+    """`needle` appears in `haystack` respecting word boundaries."""
+    if not needle:
         return False
-    return re.search(rf"(?<!\w){re.escape(aiguille)}(?!\w)", botte) is not None
+    return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
 
 
-def _significatif(s: str) -> bool:
-    """Evite qu'une reponse quelconque ('le', 'a') soit acceptee parce qu'elle est dans le signal."""
+def _significant(s: str) -> bool:
+    """Prevent tiny generic words ('the', 'a') from triggering matches in verbose signals."""
     return len(s) >= 3 or any(not c.isascii() for c in s)
 
 
-def signal_trouve(signal: str, reponse: str) -> bool:
-    """L'adversaire a-t-il demasque le signal ? Arbitrage deterministe (aucun LLM).
+def signal_found(signal: str, response: str) -> bool:
+    """Has the opponent unmasked the signal? Deterministic resolution (no LLM).
 
-    Accepte dans les deux sens : le signal cite dans une phrase ("ils utilisent l'emoji ☀️"),
-    ou une reponse nue qui est le coeur d'un signal verbeux ("tranquille" vs "le mot tranquille").
+    Accepted in both directions: signal quoted in a sentence, or a raw answer that is
+    the core of a verbose signal.
     """
-    a, b = normaliser(signal), normaliser(reponse)
-    # une equipe sans signal convenu ne peut pas etre "demasquee"
-    if not a or not b or a == normaliser(AUCUN_SIGNAL):
+    a, b = normalize(signal), normalize(response)
+    # a team with no signal agreed cannot be unmasked
+    if not a or not b or a == normalize(NO_SIGNAL):
         return False
-    if _contient(a, b):
+    if _contains(a, b):
         return True
-    return _significatif(b) and _contient(b, a)
+    return _significant(b) and _contains(b, a)

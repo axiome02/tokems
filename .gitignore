@@ -11,10 +11,3 @@ dashboard/state.json
 dashboard/partie.txt
 results_probe/
 results_avant_correctifs/
-
-CLAUDE.md
-PLAN_V0.md
-tests/
-conftest.py
-pyproject.toml
-requirements-dev.txt

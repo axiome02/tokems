@@ -7,7 +7,7 @@ from .llm.client import LLMClient
 
 
 class Agent:
-    """Couture unique : l'orchestrateur ne connait que ca. Les agents LLM l'implementent."""
+    """Couture interface: the orchestrator only communicates through this. LLM agents implement it."""
 
     def negotiate(self, view: PlayerView) -> Nego:
         raise NotImplementedError
@@ -18,26 +18,26 @@ class Agent:
     def decide_card(self, view: PlayerView):
         raise NotImplementedError
 
-    def reflechir(self, view: PlayerView) -> str:
+    def reflect(self, view: PlayerView) -> str:
         raise NotImplementedError
 
     def decide_discussion(self, view: PlayerView) -> tuple[str, Call, str]:
         raise NotImplementedError
 
-    def deviner_signal(self, view: PlayerView) -> Guess:
+    def guess_signal(self, view: PlayerView) -> Guess:
         raise NotImplementedError
 
-    def juger_signal(self, convention: str, declencheur: str, texte: str) -> bool:
+    def judge_signal(self, convention: str, trigger: str, text: str) -> bool:
         raise NotImplementedError
 
-    def juger_riposte(self, convention: str, declencheur: str, reponse: str) -> bool:
+    def judge_comeback(self, convention: str, trigger: str, response: str) -> bool:
         raise NotImplementedError
 
 
 class LLMAgent(Agent):
-    """Enveloppe un LLMClient : construit le prompt depuis la vue -> chat() -> parse.
+    """Wraps an LLMClient: constructs prompt from view -> chat() -> parse.
 
-    Memorise le dernier echange (prompt + reponse brute) dans self.last_io pour la trace.
+    Stores the last exchange (prompt + raw response) in self.last_io for tracing.
     """
 
     def __init__(self, client: LLMClient, lang: str = "en"):
@@ -46,7 +46,7 @@ class LLMAgent(Agent):
         self.last_io: tuple[str, str, str] | None = None  # (system, user, raw)
 
     def _ask(self, prompt: tuple[str, str], max_tokens: int | None = None, pid: int | None = None) -> str:
-        """Envoie (system, user) au client, memorise l'echange pour la trace, renvoie le brut."""
+        """Sends (system, user) to client, logs the exchange, returns raw string."""
         system, user = prompt
         from .llm import _http
         old_pid = getattr(_http.api_tracker, "current_pid", None)
@@ -61,37 +61,36 @@ class LLMAgent(Agent):
                 _http.api_tracker.current_pid = old_pid
 
     def negotiate(self, view: PlayerView) -> Nego:
-        return parse.parse_negociation(self._ask(prompts.prompt_negociation(view, self.lang), pid=view.pid))
+        return parse.parse_negotiation(self._ask(prompts.prompt_negotiation(view, self.lang), pid=view.pid))
 
     def debrief(self, view: PlayerView) -> Nego:
-        return parse.parse_negociation(self._ask(prompts.prompt_debriefing(view, self.lang), pid=view.pid))
+        return parse.parse_negotiation(self._ask(prompts.prompt_debriefing(view, self.lang), pid=view.pid))
 
     def decide_card(self, view: PlayerView):
-        return parse.parse_carte(self._ask(prompts.prompt_micro_carte(view, self.lang), pid=view.pid), view)
+        return parse.parse_card(self._ask(prompts.prompt_micro_card(view, self.lang), pid=view.pid), view)
 
-    # poste de cout n°1 (145k tokens en partie 404 avec un monologue long) ; releve a 500
-    # sur demande explicite (2026-07-23), acceptant le surcout pour plus de marge de raisonnement
-    MAX_TOKENS_REFLEXION = 500
+    # Cost post #1 (145k tokens in game 404 with a long monologue); raised to 500
+    # on explicit request (2026-07-23), accepting extra cost for more reasoning headroom
+    MAX_TOKENS_REFLECTION = 500
 
-    def reflechir(self, view: PlayerView) -> str:
-        """Monologue interieur : on garde le texte brut, il n'y a rien a parser."""
-        return self._ask(prompts.prompt_reflexion(view, self.lang),
-                          max_tokens=self.MAX_TOKENS_REFLEXION, pid=view.pid).strip()
+    def reflect(self, view: PlayerView) -> str:
+        """Inner monologue: raw text is kept, no parsing needed."""
+        return self._ask(prompts.prompt_reflection(view, self.lang),
+                         max_tokens=self.MAX_TOKENS_REFLECTION, pid=view.pid).strip()
 
     def decide_discussion(self, view: PlayerView) -> tuple[str, Call, str]:
         return parse.parse_discussion(self._ask(prompts.prompt_discussion(view, self.lang), pid=view.pid), view)
 
-    def deviner_signal(self, view: PlayerView) -> Guess:
+    def guess_signal(self, view: PlayerView) -> Guess:
         return parse.parse_riposte(self._ask(prompts.prompt_riposte(view, self.lang), pid=view.pid))
 
-    def juger_signal(self, convention: str, declencheur: str, texte: str) -> bool:
-        """Jugement de mesure (pure mesure, sans effet sur la partie) : le signal a-t-il ete
-        compris, au-dela de la detection litterale du moteur ? Voir CLAUDE.md, lecon sur la
-        cecite aux paraphrases."""
-        return parse.parse_jugement(
-            self._ask(prompts.prompt_juge_signal(convention, declencheur, texte, self.lang)))
+    def judge_signal(self, convention: str, trigger: str, text: str) -> bool:
+        """Measurement judgment (pure measurement, no effect on the game): was the signal
+        understood beyond literal matching? See CLAUDE.md."""
+        return parse.parse_judgment(
+            self._ask(prompts.prompt_judge_signal(convention, trigger, text, self.lang)))
 
-    def juger_riposte(self, convention: str, declencheur: str, reponse: str) -> bool:
-        """Appelle le Juge LLM pour evaluer si la riposte adverse est correcte semantiquement."""
-        return parse.parse_jugement(
-            self._ask(prompts.prompt_juge_riposte(convention, declencheur, reponse, self.lang)))
+    def judge_comeback(self, convention: str, trigger: str, response: str) -> bool:
+        """Calls the LLM Judge to evaluate if the opponent's comeback is semantically correct."""
+        return parse.parse_judgment(
+            self._ask(prompts.prompt_judge_riposte(convention, trigger, response, self.lang)))

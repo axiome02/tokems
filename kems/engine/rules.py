@@ -2,38 +2,38 @@ from __future__ import annotations
 
 from ..i18n import t
 from .actions import Call, Take
-from .cards import est_carre
-from .signaux import normaliser, signal_trouve  # noqa: F401  (re-exportes pour l'orchestrateur)
+from .cards import is_square
+from .signaux import normalize, signal_found  # noqa: F401  (re-exported for the orchestrator)
 from .state import Event, GameState
 
 
-def etape(state: GameState, type_: str, pid: int | None, texte: str,
-          prive: str | None = None, **extra) -> None:
-    """Ajoute une etape a la timeline, avec un instantane du centre et des mains.
+def step(state: GameState, type_: str, pid: int | None, text: str,
+         private: str | None = None, **extra) -> None:
+    """Adds a step to the timeline, with a snapshot of the center and hands.
 
-    Sert au rejeu pas a pas du tableau de bord. N'influence jamais la partie.
+    Used for step-by-step replay in the dashboard. Never influences the game.
     """
     state.timeline.append({
         "i": len(state.timeline),
-        "manche": state.manche, "tour": state.tour, "phase": state.phase,
-        "type": type_, "pid": pid, "texte": texte, "prive": prive,
-        "centre": [str(c) for c in state.center],
-        "mains": {str(p.pid): [str(c) for c in state.hands.get(p.pid, [])]
+        "round": state.round, "turn": state.turn, "phase": state.phase,
+        "type": type_, "pid": pid, "text": text, "private": private,
+        "center": [str(c) for c in state.center],
+        "hands": {str(p.pid): [str(c) for c in state.hands.get(p.pid, [])]
                   for p in state.players},
         **extra,
     })
 
 
-def _log(state: GameState, type_: str, pid: int | None, texte: str, **extra) -> None:
-    ev = Event(state.tour, type_, pid, texte, manche=state.manche)
+def _log(state: GameState, type_: str, pid: int | None, text: str, **extra) -> None:
+    ev = Event(state.turn, type_, pid, text, round=state.round)
     state.public_log.append(ev)
-    etape(state, type_, pid, texte, **extra)
+    step(state, type_, pid, text, **extra)
     if state.on_event is not None:
         state.on_event(ev, state)
 
 
-def valider_et_appliquer_echange(state: GameState, pid: int, take: Take) -> bool:
-    """Valide un echange contre la verite du moteur. Rejette tout coup illegal."""
+def validate_and_apply_exchange(state: GameState, pid: int, take: Take) -> bool:
+    """Validates an exchange against the engine truth. Rejects any illegal move."""
     hand = state.hands[pid]
     if take.from_center not in state.center:
         return False
@@ -46,11 +46,11 @@ def valider_et_appliquer_echange(state: GameState, pid: int, take: Take) -> bool
     return True
 
 
-def resoudre_poubelle(state: GameState) -> None:
-    """Balaye le centre a la poubelle et distribue 4 nouvelles cartes (remelange si besoin)."""
+def resolve_discard(state: GameState) -> None:
+    """Sweeps the center to the discard pile and distributes 4 new cards (reshuffles if needed)."""
     state.discard.extend(state.center)
     state.center = []
-    for _ in range(state.config.taille_centre):
+    for _ in range(state.config.center_size):
         if not state.deck:
             if not state.discard:
                 break
@@ -59,251 +59,251 @@ def resoudre_poubelle(state: GameState) -> None:
             state.rng_cards.shuffle(state.deck)
         if state.deck:
             state.center.append(state.deck.pop())
-    state.centres_joues += 1
+    state.centers_played += 1
 
 
-def poser_signal(state: GameState, equipe: int, texte: str, declencheur: str = "") -> None:
-    state.signals[equipe] = texte
-    # a defaut de declencheur explicite, on retombe sur la convention elle-meme
-    state.declencheurs[equipe] = declencheur or texte
+def set_signal(state: GameState, team: int, text: str, trigger: str = "") -> None:
+    state.signals[team] = text
+    # by default if no explicit trigger, fall back on the convention itself
+    state.triggers[team] = trigger or text
 
 
-def declencheur_exploitable(declencheur: str) -> bool:
-    """Le declencheur est-il assez specifique pour qu'on ose censurer un message dessus ?
+def trigger_exploitable(trigger: str) -> bool:
+    """Is the trigger specific enough that we dare censor a message based on it?
 
-    Les modeles produisent parfois des declencheurs courts et courants ('42', 'Pique' — un mot
-    de jeu de cartes !). Les appliquer tels quels supprimerait des messages innocents. Dans le
-    doute on s'abstient : mieux vaut laisser passer une emission que censurer a tort.
+    Models sometimes produce short and common triggers ('42', 'Spades' - a card game word!).
+    Applying them as-is would remove innocent messages. In doubt, we abstain: better to
+    let a signal pass than to censor wrongly.
     """
-    n = normaliser(declencheur)
+    n = normalize(trigger)
     return bool(n) and (len(n) >= 4 or any(not c.isascii() for c in n))
 
 
-def emission_sans_carre(state: GameState, pid: int, message: str) -> bool:
-    """Un joueur SANS carre a-t-il glisse le declencheur de son equipe dans son message ?
+def emission_without_square(state: GameState, pid: int, message: str) -> bool:
+    """Did a player WITHOUT a square slip their team's trigger in their message?
 
-    PURE MESURE : le moteur ne bloque plus rien. Emettre son propre signal sans carre est un
-    coup legal — c'est du bluff, ou une erreur, et dans les deux cas c'est une donnee. Bloquer
-    revenait a mettre des roulettes pour petits modeles et a interdire une vraie strategie.
+    PURE MEASUREMENT: the engine no longer blocks anything. Emitting one's own signal without
+    a square is a legal move - it's bluffing, or a mistake, and in both cases it's data. Blocking
+    meant putting training wheels for small models and forbidding a real strategy.
     """
-    if est_carre(state.hands[pid]):
+    if is_square(state.hands[pid]):
         return False
-    declencheur = state.declencheurs.get(state.equipe_de(pid), "")
-    if not declencheur_exploitable(declencheur):
+    trigger = state.triggers.get(state.team_of(pid), "")
+    if not trigger_exploitable(trigger):
         return False
-    return signal_trouve(declencheur, message)
+    return signal_found(trigger, message)
 
 
-def signal_emis_par_le_partenaire(state: GameState, pid: int) -> bool:
-    """Le declencheur de l'equipe apparait-il dans un message du partenaire, CETTE manche ?
+def signal_emitted_by_partner(state: GameState, pid: int) -> bool:
+    """Has the team's trigger appeared in a partner's message, THIS round?
 
-    Un adversaire qui prononce le meme texte par hasard ne compte pas. Le filtre sur la manche
-    est indispensable : le chat public n'est jamais efface, un signal emis a la manche 1
-    validerait sinon un appel a la manche 3.
+    An opponent saying the same text by accident does not count. The filter on the round
+    is essential: the public chat is never cleared, a signal emitted in round 1
+    would otherwise validate a call in round 3.
     """
-    partenaire = state.partenaire(pid)
-    if partenaire is None:
+    partner = state.partner(pid)
+    if partner is None:
         return False
-    declencheur = state.declencheurs.get(state.equipe_de(pid), "")
+    trigger = state.triggers.get(state.team_of(pid), "")
     return any(
-        ev.type == "MESSAGE" and ev.pid == partenaire and ev.manche == state.manche
-        and signal_trouve(declencheur, ev.texte)
+        ev.type == "MESSAGE" and ev.pid == partner and ev.round == state.round
+        and signal_found(trigger, ev.text)
         for ev in state.public_log
     )
 
 
 def _episode(state: GameState, pid: int) -> dict | None:
-    """L'episode de signalisation en cours pour ce joueur dans la manche courante."""
+    """The active signaling episode for this player in the current round."""
     for e in reversed(state.episodes):
-        if e["manche"] == state.manche and e["pid"] == pid:
+        if e["round"] == state.round and e["pid"] == pid:
             return e
     return None
 
 
-def ouvrir_episode(state: GameState, pid: int) -> None:
-    """Un joueur vient de completer un carre : on ouvre son episode de signalisation."""
+def open_episode(state: GameState, pid: int) -> None:
+    """A player just completed a square: we open their signaling episode."""
     if _episode(state, pid) is not None:
         return
     state.episodes.append({
-        "manche": state.manche, "pid": pid, "modele": state.players[pid].modele,
-        "tour_carre": state.tour, "tour_signal": None, "tour_parole": None,
-        "tour_signal_llm": None, "tour_kemps": None, "capte": False, "demasque": None,
+        "round": state.round, "pid": pid, "model": state.players[pid].model,
+        "square_turn": state.turn, "signal_turn": None, "speech_turn": None,
+        "llm_signal_turn": None, "kemps_turn": None, "caught": False, "unmasked": None,
     })
 
 
-def marquer_signal_emis(state: GameState, pid: int, litteral: bool, compris: bool | None = None) -> None:
-    """Le porteur du carre vient de parler.
+def mark_signal_emitted(state: GameState, pid: int, literal: bool, understood: bool | None = None) -> None:
+    """The owner of the square just spoke.
 
-    `litteral` : son message contenait le declencheur mot pour mot. Sinon on note quand meme
-    qu'il a parle (`tour_parole`) — le moteur ne sait pas reconnaitre une paraphrase, et
-    conclure « signal jamais emis » serait un mensonge (cf. « karre » pour « kare »).
-    `compris` (optionnel, PURE MESURE) : jugement LLM independant, fourni par l'orchestrateur —
-    ce module reste 100% deterministe et ne sait pas ce qu'est un LLM ; on se contente d'accepter
-    un bool tout fait. Sert a mesurer la cecite aux paraphrases (`tour_signal` la sous-estime).
+    `literal`: their message contained the trigger word for word. Otherwise we still note
+    they spoke (`speech_turn`) - the engine cannot recognize paraphrases, and
+    concluding "signal never emitted" would be a lie (cf. "karre" for "kare").
+    `understood` (optional, PURE MEASUREMENT): independent LLM judgment, provided by the
+    orchestrator - this module remains 100% deterministic and doesn't know what an LLM is;
+    we simply accept a ready-made bool. Helps measure paraphrase blindness (`signal_turn` underestimates it).
     """
     e = _episode(state, pid)
     if e is None:
         return
-    if e["tour_parole"] is None:
-        e["tour_parole"] = state.tour
-    if litteral and e["tour_signal"] is None:
-        e["tour_signal"] = state.tour
-    if compris and e.get("tour_signal_llm") is None:
-        e["tour_signal_llm"] = state.tour
+    if e["speech_turn"] is None:
+        e["speech_turn"] = state.turn
+    if literal and e["signal_turn"] is None:
+        e["signal_turn"] = state.turn
+    if understood and e.get("llm_signal_turn") is None:
+        e["llm_signal_turn"] = state.turn
 
 
-def resoudre_appels(state: GameState, calls: dict[int, Call], ordre: list[int]) -> None:
-    """Resout le premier appel non-NONE selon l'ordre donne. Peut terminer la partie."""
+def resolve_calls(state: GameState, calls: dict[int, Call], order: list[int]) -> None:
+    """Resolves the first non-NONE call according to the given order. Can end the game."""
     lang = state.config.lang
-    for pid in ordre:
+    for pid in order:
         call = calls.get(pid)
         if not call or call.kind == "NONE":
             continue
-        equipe = state.equipe_de(pid)
-        nom = state.players[pid].nom
+        team = state.team_of(pid)
+        name = state.players[pid].name
 
         if call.kind == "KEMPS":
-            partner = state.partenaire(pid)
-            # Un appel n'est annule que s'il est INFONDE au sens fort : le partenaire n'a pas de
-            # carre ET aucun declencheur n'a ete repere. Des que le partenaire a reellement un
-            # carre, on resout normalement — le moteur ne sait pas reconnaitre une paraphrase
-            # ("karre" pour "kare"), il ne doit donc jamais punir une transmission reussie.
-            # Regle fidele au Kems : l'appel est resolu, point. Le moteur n'annule rien et ne
-            # protege personne d'un appel a l'aveugle — c'est un pari, et le pari se paie.
-            # On note seulement, pour la mesure, si un signal avait reellement circule.
-            emis = signal_emis_par_le_partenaire(state, pid)
-            if not emis:
-                state.appels_sans_signal.append({
-                    "manche": state.manche, "tour": state.tour, "pid": pid,
-                    "modele": state.players[pid].modele, "gagnant": est_carre(state.hands[partner]),
+            partner = state.partner(pid)
+            # A call is only canceled if it is UNFOUNDED in the strong sense: the partner does not
+            # have a square AND no trigger was spotted. As soon as the partner actually has a
+            # square, we resolve normally - the engine cannot recognize a paraphrase
+            # ("karre" for "kare"), it must therefore never punish a successful transmission.
+            # Rule loyal to Kems: the call is resolved, period. The engine doesn't cancel anything
+            # and protects no one from a blind call - it's a bet, and the bet has to be paid.
+            # We only note, for measurement, if a signal had actually circulated.
+            emitted = signal_emitted_by_partner(state, pid)
+            if not emitted:
+                state.calls_without_signal.append({
+                    "round": state.round, "turn": state.turn, "pid": pid,
+                    "model": state.players[pid].model, "winner": is_square(state.hands[partner]),
                 })
 
-            success = est_carre(state.hands[partner])
-            winner = equipe if success else 1 - equipe
+            success = is_square(state.hands[partner])
+            winner = team if success else 1 - team
             state.outcome = {
                 "winner_team": winner,
                 "reason": t(lang, "kemps_success" if success else "kemps_fail"),
                 "caller": pid, "target": partner, "kind": "KEMPS", "success": success,
-                # metrique : le partenaire avait-il reellement emis le declencheur ?
-                "signal_reellement_emis": emis,
+                # metric: did the partner actually emit the trigger?
+                "signal_actually_emitted": emitted,
             }
-            _log(state, "CALL", pid, t(lang, "kemps_call_success" if success else "kemps_call_fail", nom=nom))
+            _log(state, "CALL", pid, t(lang, "kemps_call_success" if success else "kemps_call_fail", nom=name))
             ep = _episode(state, partner)
             if ep is not None:
-                ep["tour_kemps"], ep["capte"] = state.tour, success
+                ep["kemps_turn"], ep["caught"] = state.turn, success
             state.finished = True
-            # dernier recours de l'equipe qui encaisse : demasquer le signal adverse
+            # last resort for the team that conceded: unmask the opposing signal
             if success:
-                state.riposte_equipe = 1 - equipe
+                state.comeback_team = 1 - team
             return
 
         if call.kind == "COUNTER":
-            opp = 1 - equipe
-            holders = [p for p in state.joueurs_equipe(opp) if est_carre(state.hands[p])]
+            opp = 1 - team
+            holders = [p for p in state.team_players(opp) if is_square(state.hands[p])]
             success = len(holders) > 0
-            winner = equipe if success else opp
+            winner = team if success else opp
             state.outcome = {
                 "winner_team": winner,
                 "reason": t(lang, "counter_success" if success else "counter_fail"),
                 "caller": pid, "kind": "COUNTER", "success": success,
             }
-            _log(state, "CALL", pid, t(lang, "counter_call_success" if success else "counter_call_fail", nom=nom))
+            _log(state, "CALL", pid, t(lang, "counter_call_success" if success else "counter_call_fail", nom=name))
             state.finished = True
             return
 
 
-def resoudre_riposte(state: GameState, reponses: dict[int, str],
-                     reponses_trouvees: dict[int, bool] | None = None) -> None:
-    """Riposte : l'equipe qui vient d'encaisser un KEMPS nomme le signal adverse.
+def resolve_comeback(state: GameState, responses: dict[int, str],
+                     responses_found: dict[int, bool] | None = None) -> None:
+    """Comeback (riposte): the team that just conceded a KEMPS names the opposing signal.
 
-    Si l'un de ses deux joueurs le demasque, elle renverse le resultat et gagne.
-    L'arbitrage s'appuie sur les resultats pre-evalues fournis (ex: par un Juge LLM),
-    ou retombe sur la detection litterale en guise de repli.
+    If either of its two players unmasks it, they reverse the result and win.
+    Arbitration relies on the pre-evaluated results provided (e.g. by an LLM Judge),
+    or falls back on literal detection.
     """
     lang = state.config.lang
-    equipe = state.riposte_equipe
-    state.riposte_equipe = None
-    if equipe is None or state.outcome is None:
+    team = state.comeback_team
+    state.comeback_team = None
+    if team is None or state.outcome is None:
         return
 
-    signal_adverse = state.signals.get(1 - equipe, "")
-    declencheur_adverse = state.declencheurs.get(1 - equipe, "")
-    tentatives = []
-    gagnant: int | None = None
-    for pid in state.joueurs_equipe(equipe):
-        reponse = (reponses.get(pid) or "").strip()
+    opposing_signal = state.signals.get(1 - team, "")
+    opposing_trigger = state.triggers.get(1 - team, "")
+    attempts = []
+    winner: int | None = None
+    for pid in state.team_players(team):
+        response = (responses.get(pid) or "").strip()
         
-        if reponses_trouvees is not None:
-            trouve = reponses_trouvees.get(pid, False)
+        if responses_found is not None:
+            found = responses_found.get(pid, False)
         else:
-            trouve = (signal_trouve(signal_adverse, reponse)
-                      or signal_trouve(declencheur_adverse, reponse))
+            found = (signal_found(opposing_signal, response)
+                     or signal_found(opposing_trigger, response))
                       
-        tentatives.append({"pid": pid, "reponse": reponse, "trouve": trouve})
+        attempts.append({"pid": pid, "response": response, "found": found})
         _log(state, "RIPOSTE", pid,
-             t(lang, "riposte_attempt_unmasked" if trouve else "riposte_attempt_wrong",
-               nom=state.players[pid].nom, reponse=reponse or t(lang, "nothing")))
-        if trouve and gagnant is None:
-            gagnant = pid
+             t(lang, "riposte_attempt_unmasked" if found else "riposte_attempt_wrong",
+               nom=state.players[pid].name, reponse=response or t(lang, "nothing")))
+        if found and winner is None:
+            winner = pid
 
     for e in state.episodes:
-        if e["manche"] == state.manche and state.equipe_de(e["pid"]) != equipe:
-            e["demasque"] = gagnant is not None
+        if e["round"] == state.round and state.team_of(e["pid"]) != team:
+            e["unmasked"] = winner is not None
     state.outcome["riposte"] = {
-        "equipe": equipe,
-        "signal_adverse": signal_adverse,
-        "tentatives": tentatives,
-        "reussie": gagnant is not None,
+        "team": team,
+        "opposing_signal": opposing_signal,
+        "attempts": attempts,
+        "success": winner is not None,
     }
-    if gagnant is not None:
-        state.outcome["winner_team"] = equipe
+    if winner is not None:
+        state.outcome["winner_team"] = team
         state.outcome["reason"] = t(lang, "riposte_success_reason",
-                                     nom=state.players[gagnant].nom, signal=signal_adverse)
-        _log(state, "SYSTEM", None, t(lang, "riposte_success_log", equipe=equipe))
+                                    nom=state.players[winner].name, signal=opposing_signal)
+        _log(state, "SYSTEM", None, t(lang, "riposte_success_log", equipe=team))
     else:
-        # NE JAMAIS ecrire le vrai signal ici : le chat est public et le match continue
+        # NEVER write the real signal here: the chat is public and the match continues
         _log(state, "SYSTEM", None, t(lang, "riposte_fail_log"))
 
 
-def verifier_fin(state: GameState) -> None:
-    """Fin de la MANCHE courante par epuisement (aucun appel)."""
+def check_end(state: GameState) -> None:
+    """End of current ROUND by exhaustion (no call)."""
     if state.finished:
         return
     cfg = state.config
-    if state.tour_manche >= cfg.max_tours or state.centres_joues >= cfg.max_centres_par_partie:
+    if state.round_turn >= cfg.max_turns or state.centers_played >= cfg.max_centers_per_round:
         state.outcome = {"winner_team": None, "reason": t(cfg.lang, "manche_null")}
         state.finished = True
 
 
-def signal_brule(state: GameState, equipe: int) -> bool:
-    """Le signal d'une equipe vient-il d'etre demasque (riposte reussie de la manche ecoulee) ?"""
-    if not state.historique_manches:
+def signal_burned(state: GameState, team: int) -> bool:
+    """Was the team's signal just unmasked (successful comeback in the elapsed round)?"""
+    if not state.round_history:
         return False
-    r = state.historique_manches[-1].get("riposte")
-    return bool(r and r["reussie"] and r["equipe"] == 1 - equipe)
+    r = state.round_history[-1].get("riposte")
+    return bool(r and r["success"] and r["team"] == 1 - team)
 
 
-def cloturer_manche(state: GameState) -> None:
-    """Attribue le point de la manche et determine si le match est termine.
+def close_round(state: GameState) -> None:
+    """Attributes the point of the round and determines if the match is finished.
 
-    A appeler APRES la riposte eventuelle, car celle-ci peut renverser le vainqueur.
+    To be called AFTER the optional comeback attempt, as it can reverse the winner.
     """
     lang = state.config.lang
     o = state.outcome or {"winner_team": None, "reason": t(lang, "manche_no_result")}
-    gagnant = o.get("winner_team")
-    if gagnant is not None:
-        state.scores[gagnant] += 1
-    o["manche"] = state.manche
-    state.historique_manches.append(o)
+    winner = o.get("winner_team")
+    if winner is not None:
+        state.scores[winner] += 1
+    o["round"] = state.round
+    state.round_history.append(o)
 
     score = f"{state.scores[0]} - {state.scores[1]}"
-    fin = o.get("reason", "?")
-    _log(state, "SYSTEM", None, t(lang, "manche_end_log", manche=state.manche, fin=fin, score=score))
+    end_reason = o.get("reason", "?")
+    _log(state, "SYSTEM", None, t(lang, "manche_end_log", manche=state.round, fin=end_reason, score=score))
 
-    if gagnant is not None and state.scores[gagnant] >= state.config.points_pour_gagner:
-        state.match_termine = True
-        state.vainqueur_match = gagnant
-    elif state.manche >= state.config.max_manches:
-        state.match_termine = True
-        meilleur = max(state.scores, key=lambda e: state.scores[e])
-        state.vainqueur_match = None if state.scores[0] == state.scores[1] else meilleur
+    if winner is not None and state.scores[winner] >= state.config.points_to_win:
+        state.match_finished = True
+        state.match_winner = winner
+    elif state.round >= state.config.max_rounds:
+        state.match_finished = True
+        best = max(state.scores, key=lambda e: state.scores[e])
+        state.match_winner = None if state.scores[0] == state.scores[1] else best

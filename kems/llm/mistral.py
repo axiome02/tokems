@@ -7,7 +7,7 @@ from .client import LLMClient
 
 
 class MistralClient(LLMClient):
-    """Client Mistral (La Plateforme). Cle via MISTRAL_API_KEY."""
+    """Mistral Client (La Plateforme). Key via MISTRAL_API_KEY."""
 
     nom = "mistral"
     URL = "https://api.mistral.ai/v1/chat/completions"

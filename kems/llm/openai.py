@@ -7,7 +7,7 @@ from .client import LLMClient
 
 
 class OpenAIClient(LLMClient):
-    """Client OpenAI (GPT). Cle via OPENAI_API_KEY."""
+    """OpenAI Client (GPT). Key via OPENAI_API_KEY."""
 
     nom = "gpt"
     URL = "https://api.openai.com/v1/chat/completions"

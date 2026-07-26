@@ -7,7 +7,7 @@ from .client import LLMClient
 
 
 class KimiClient(LLMClient):
-    """Client Kimi (Moonshot AI), API compatible OpenAI. Cle via KIMI_API_KEY."""
+    """Kimi Client (Moonshot AI), OpenAI compatible API. Key via KIMI_API_KEY."""
 
     nom = "kimi"
     URL = "https://api.moonshot.ai/v1/chat/completions"

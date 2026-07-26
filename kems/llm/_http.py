@@ -5,7 +5,7 @@ import time
 
 import requests
 
-PLAFOND_ATTENTE = 60.0     # s : au-dela, c'est un quota epuise, pas une limite de debit
+PLAFOND_ATTENTE = 60.0     # s: beyond this, it's an exhausted quota, not a rate limit
 
 
 import threading
@@ -22,16 +22,16 @@ api_tracker = APITracker()
 
 
 class QuotaError(RuntimeError):
-    """L'API refuse durablement (429/403 persistant) : reessayer ne sert a rien."""
+    """The API permanently refuses (persistent 429/403): retrying is useless."""
 
 
 def post_json(url: str, headers: dict, payload: dict, *, retries: int = 6,
               timeout: int = 60, pause: float = 0.5, nom: str = "LLM") -> dict:
-    """POST JSON avec backoff exponentiel, respect de Retry-After sur 429/5xx.
+    """POST JSON with exponential backoff, respects Retry-After on 429/5xx.
 
-    Le CORPS de la reponse d'erreur est conserve et remonte : c'est la seule facon de
-    distinguer une limite de debit (« reessaie dans 20 s ») d'un quota epuise (« reviens
-    demain »), et les deux arrivent en HTTP 429.
+    The BODY of the error response is kept and raised: it's the only way to distinguish
+    between a rate limit ("retry in 20s") and an exhausted quota ("come back tomorrow"),
+    and both arrive as HTTP 429.
     """
     last = None
 
@@ -51,10 +51,10 @@ def post_json(url: str, headers: dict, payload: dict, *, retries: int = 6,
             r = requests.post(url, headers=headers, json=payload, timeout=timeout)
             if r.status_code == 429 or r.status_code >= 500:
                 detail = (r.text or "").strip()[:300]
-                last = f"HTTP {r.status_code} — {detail or 'pas de detail'}"
+                last = f"HTTP {r.status_code} — {detail or 'no detail'}"
                 if attempt == retries - 1:
                     break
-                # Retry-After fait foi ; sinon backoff exponentiel + jitter
+                # Retry-After takes precedence; otherwise exponential backoff + jitter
                 wait = float(r.headers.get("Retry-After", 2 ** attempt))
                 wait_time = min(wait, PLAFOND_ATTENTE)
 
@@ -72,7 +72,7 @@ def post_json(url: str, headers: dict, payload: dict, *, retries: int = 6,
                 continue
             r.raise_for_status()
             if pause:
-                time.sleep(pause)  # courtoisie envers les tiers gratuits
+                time.sleep(pause)  # courtesy delay to avoid hitting free tier limits
 
             if api_tracker.state is not None and api_tracker.current_pid is not None:
                 api_tracker.state.api_status[str(api_tracker.current_pid)] = {
