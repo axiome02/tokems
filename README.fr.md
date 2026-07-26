@@ -101,6 +101,7 @@ Dans VSCode : ouvre le terminal intégré (`` Ctrl+` ``) et lance la commande ; 
    ANTHROPIC_API_KEY=ta_cle_anthropic
    KIMI_API_KEY=ta_cle_kimi
    GITHUB_TOKEN=ta_cle_github  # Optionnel : pour interroger gratuitement GPT/Claude via GitHub Models
+   OPENROUTER_API_KEY=ta_cle_openrouter  # Optionnel : clé universelle (OpenAI, Claude, Llama...) via OpenRouter
    ```
    Le `.env` est ignoré par git. Seules les clés des fournisseurs que tu utilises sont nécessaires.
 
@@ -112,6 +113,11 @@ Dans VSCode : ouvre le terminal intégré (`` Ctrl+` ``) et lance la commande ; 
    Si tu as configuré `GITHUB_TOKEN`, tu peux faire s'affronter des modèles gratuitement (comme `gpt-4o` ou `claude-3-5-sonnet`) en utilisant le fournisseur `github` :
    ```powershell
    .\.venv\Scripts\python.exe -m kems.run --agents github,github,github,github --model gpt-4o-mini --seed 42 --live
+   ```
+
+   Si tu as configuré `OPENROUTER_API_KEY`, tu peux utiliser le fournisseur `openrouter` (par exemple avec Llama 3.1 gratuit) :
+   ```powershell
+   .\.venv\Scripts\python.exe -m kems.run --agents openrouter,openrouter,openrouter,openrouter --model meta-llama/llama-3.1-8b-instruct:free --seed 42 --live
    ```
 
 Les équipes sont : **équipe 0** = joueurs 1 & 3, **équipe 1** = joueurs 2 & 4 (dans l'ordre `--agents`).
@@ -148,3 +154,15 @@ kems/
 tests/                 suite de tests
 transcripts/           parties générées
 ```
+
+---
+
+## 6. Architecture des Agents « Cerveau / Exécuteur »
+
+Pour éviter le contournement cognitif et les fausses alarmes (où un joueur crie KEMPS par pur réflexe suite à un mot-clé prononcé par accident alors qu'il avait prévu d'attendre), la phase de discussion publique et de décision d'appel est scindée en deux étapes isolées et séquentielles :
+
+1. **Le Cerveau Stratégique** : A accès à l'historique complet du chat public, à sa main et au mot déclencheur secret. Il analyse la situation à froid, planifie et prend une décision finale (choix du message public à envoyer, et choix de l'action : `KEMPS`, `COUNTER` ou `NONE`).
+2. **L'Exécuteur de Formatage** : Est complètement isolé du chat public, des cartes en main, des règles du jeu et du mot déclencheur secret. Il reçoit uniquement la décision du cerveau et la traduit à la lettre dans le format strict attendu par le moteur de jeu.
+
+Cette isolation empêche toute fuite attentionnelle au niveau du formatage, garantissant que seule la réflexion rationnelle et stratégique dicte les actions de jeu.
+

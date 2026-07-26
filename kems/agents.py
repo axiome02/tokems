@@ -79,7 +79,17 @@ class LLMAgent(Agent):
                          max_tokens=self.MAX_TOKENS_REFLECTION, pid=view.pid).strip()
 
     def decide_discussion(self, view: PlayerView) -> tuple[str, Call, str]:
-        return parse.parse_discussion(self._ask(prompts.prompt_discussion(view, self.lang), pid=view.pid), view)
+        # 1) Brain Call: analyze and make the strategic decision
+        brain_res = self._ask(prompts.prompt_discussion_brain(view, self.lang), pid=view.pid)
+        msg = parse._line(brain_res, "DECISION_MESSAGE") or ""
+        call_str = (parse._line(brain_res, "DECISION_CALL") or "NONE").strip().upper()
+        plan = parse._line(brain_res, "PLAN") or view.my_plan or ""
+
+        # 2) Executor Call: formats the action exactly, isolated from chat and trigger words
+        executor_prompt = prompts.prompt_discussion_executor(msg, call_str, plan, view.partner_name, self.lang)
+        executor_res = self._ask(executor_prompt, pid=view.pid)
+        
+        return parse.parse_discussion(executor_res, view)
 
     def guess_signal(self, view: PlayerView) -> Guess:
         return parse.parse_riposte(self._ask(prompts.prompt_riposte(view, self.lang), pid=view.pid))

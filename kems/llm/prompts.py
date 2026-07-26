@@ -33,6 +33,14 @@ def prompt_discussion(view: PlayerView, lang: str = "en") -> tuple[str, str]:
     return _mod(lang).prompt_discussion(view)
 
 
+def prompt_discussion_brain(view: PlayerView, lang: str = "en") -> tuple[str, str]:
+    return _mod(lang).prompt_discussion_brain(view)
+
+
+def prompt_discussion_executor(message: str, call: str, plan: str, partner_name: str, lang: str = "en") -> tuple[str, str]:
+    return _mod(lang).prompt_discussion_executor(message, call, plan, partner_name)
+
+
 def prompt_riposte(view: PlayerView, lang: str = "en") -> tuple[str, str]:
     return _mod(lang).prompt_riposte(view)
 

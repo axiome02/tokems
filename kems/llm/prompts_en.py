@@ -340,3 +340,87 @@ def prompt_judge_riposte(convention: str, trigger: str, response: str) -> tuple[
         "SIGNAL: YES or NO"
     )
     return system, user
+
+
+def prompt_discussion_brain(view: PlayerView) -> tuple[str, str]:
+    if view.has_square:
+        consigne = (
+            "You have a square right now. Signal it — don't wait for your teammate's permission "
+            "or a sign from them. Separately, also check: did their last message already carry "
+            "your signal? If so, decide to call KEMPS for them too, this turn."
+        )
+    else:
+        consigne = (
+            "Not having a square yourself has no bearing on whether you can call. Has your "
+            "teammate's message just carried your signal? If so, decide to call KEMPS. "
+            "Reminder of the cost: it only wins if they really have a square ; "
+            "otherwise your team loses the round.\n"
+            "You have NO square right now: if your own message carries the trigger, it falsely "
+            "tells your teammate you do — and if they believe it and call, your team loses the "
+            "round. The trigger must appear in your DECISION_MESSAGE only "
+            "if you are sending it on purpose, accepting that cost."
+        )
+    system = (
+        RAPPEL + "\n\n"
+        "Public discussion phase: you analyze the situation and make a strategic decision.\n"
+        "Two independent facts can both be true on the SAME turn: you may have a "
+        "square yourself (then signaling it is on you, don't wait), and/or your teammate may "
+        "have one (then a KEMPS call wins, based only on THEIR hand, never yours). Check both "
+        "every turn — one does not rule out the other.\n"
+        "Your agreed message cuts both ways: any public message of yours that carries your "
+        "trigger tells your teammate 'I have a square', whatever you actually meant — quoting "
+        "it, discussing it or joking about it IS emitting it, and it also hands your code to "
+        "both opponents. There is no way to mention your trigger in public without sending "
+        "the signal.\n"
+        "Always decide on a real message, every turn, whether or not you have anything to signal: "
+        "if only the player with a square ever speaks, your silence otherwise becomes the tell. "
+        "React to what was just said instead of dropping an isolated line — it should read as "
+        "one ongoing conversation, not a series of one-off statements.\n\n"
+        "SQUARE GUIDELINES:\n"
+        f"{consigne}\n\n"
+        "CALL OPTIONS DEFINITIONS:\n"
+        "- KEMPS: Decide this ONLY if you believe YOUR TEAMMATE has a square. It wins if they do, and loses otherwise.\n"
+        "- COUNTER: Decide this ONLY if you believe an OPPONENT has a square. It wins if they do, and loses otherwise. Never decide COUNTER against your teammate.\n"
+        "- NONE: No call this turn.\n\n"
+        "Reply on these lines:\n"
+        "ANALYSIS: <free reasoning about whether partner sent trigger, what cards are, etc.>\n"
+        "DECISION_MESSAGE: <your public message>\n"
+        "DECISION_CALL: KEMPS | COUNTER | NONE\n"
+        "PLAN: <your private plan, 1 line>"
+    )
+    user = (
+        "━━ MATCH CONTEXT ━━\n"
+        f"{_fmt_historique(view)}\n"
+        "━━ OFFICIAL FACTS ━━\n"
+        f"YOU ARE: {view.name}  |  YOUR TEAMMATE: {view.partner_name}  |  YOUR OPPONENTS: {' and '.join(view.opponents)}\n"
+        f"YOUR HAND: {_fmt_cards(view.my_hand)}  |  DO YOU HAVE A SQUARE: {'YES' if view.has_square else 'NO'}\n"
+        f"YOUR AGREED SECRET MESSAGE: {view.my_signal}\n"
+        f"EXACT TRIGGER (the literal text, as pinned by the referee): {view.my_trigger}\n"
+        f"YOUR PLAN / PERSISTENT STRATEGY: {view.my_plan or '(none)'}\n"
+        "━━ RECENT PUBLIC MESSAGES ━━\n"
+        f"{_fmt_chat_messages(view.global_chat, view.round)}\n"
+        "━━ WHAT YOU JUST TOLD YOURSELF (in private) ━━\n"
+        f"{view.my_reflection or '(nothing)'}\n"
+    )
+    return system, user
+
+
+def prompt_discussion_executor(message: str, call: str, plan: str, partner_name: str) -> tuple[str, str]:
+    system = (
+        "You are an action-formatting agent for a Kems game player.\n"
+        "You receive the decision of the player's brain and must format it exactly into the required game format.\n"
+        "Do NOT change the message, the call, or the plan. Do NOT add any thoughts, reasoning, or introductions.\n\n"
+        "Reply EXACTLY with this format:\n"
+        f"SIGNAL_RECEIVED: YES or NO (choose YES if CALL is KEMPS, otherwise NO)\n"
+        "MESSAGE: <copy the MESSAGE below>\n"
+        "TRIGGER_CHECK: YES or NO (always output NO)\n"
+        "CALL: <copy the CALL below>\n"
+        "PLAN: <copy the PLAN below>"
+    )
+    user = (
+        f"MESSAGE: {message}\n"
+        f"CALL: {call}\n"
+        f"PLAN: {plan}"
+    )
+    return system, user
+

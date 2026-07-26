@@ -965,6 +965,7 @@
             <option value="claude">claude</option>
             <option value="kimi">kimi</option>
             <option value="github">github</option>
+            <option value="openrouter">openrouter</option>
           </select></label>
         <label class="champ"><span class="eyebrow">Evaluator Model</span>
           <input type="text" id="f-eval-model" placeholder="Default model" style="width:10rem"></label>
@@ -1042,6 +1043,7 @@
             <option value="claude">claude</option>
             <option value="kimi">kimi</option>
             <option value="github">github</option>
+            <option value="openrouter">openrouter</option>
           </select></label>
         <label class="champ"><span class="eyebrow">Evaluator Model</span>
           <input type="text" id="fb-eval-model" placeholder="Default model" style="width:10rem"></label>
@@ -1475,7 +1477,8 @@ const MODELES = { mistral: ["mistral-small-latest", "mistral-medium-latest", "mi
                   gemini: ["gemini-flash-lite-latest", "gemini-flash-latest"],
                   gpt: ["gpt-4o-mini"], claude: ["claude-haiku-4-5-20251001"],
                   kimi: ["moonshot-v1-8k"],
-                  github: ["gpt-4o-mini", "gpt-4o", "meta-llama-3.1-405b-instruct", "meta-llama-3.1-70b-instruct", "mistral-large-2407"] };
+                  github: ["gpt-4o-mini", "gpt-4o", "meta-llama-3.1-405b-instruct", "meta-llama-3.1-70b-instruct", "mistral-large-2407"],
+                  openrouter: ["openai/gpt-4o-mini", "meta-llama/llama-3.1-8b-instruct:free", "google/gemini-flash-1.5", "meta-llama/llama-3-8b-instruct:free"] };
 
 let apiKeys = {};
 async function loadConfig() {

@@ -341,3 +341,86 @@ def prompt_judge_riposte(convention: str, trigger: str, reponse: str) -> tuple[s
         "SIGNAL: OUI ou NON"
     )
     return system, user
+
+
+def prompt_discussion_brain(view: PlayerView) -> tuple[str, str]:
+    if view.has_square:
+        consigne = (
+            "Tu as un carre en ce moment. Signale-le — n'attends ni permission ni signe de la part "
+            "de ton coequipier. Verifie aussi, separement : son dernier message portait-il deja "
+            "votre signal ? Si oui, décide de crier KEMPS pour lui aussi, ce tour-ci."
+        )
+    else:
+        consigne = (
+            "Ne pas avoir de carre toi-meme n'a aucune influence sur ta capacite a appeler. "
+            "Le message de ton coequipier vient-il de porter votre signal ? Si oui, décide de crier KEMPS. "
+            "Rappel du cout : ca ne gagne que s'il a vraiment un carre ; sinon ton equipe perd la manche.\n"
+            "Tu n'as PAS de carre en ce moment : si ton propre message porte le declencheur, il fait "
+            "croire a tort a ton coequipier que tu en as un — et s'il y croit et appelle, ton equipe "
+            "perd la manche. Le declencheur ne doit se trouver dans ton DECISION_MESSAGE "
+            "que si tu l'emets volontairement, en acceptant ce cout."
+        )
+    system = (
+        RAPPEL + "\n\n"
+        "Phase de discussion publique : tu analyses la situation et prends une décision stratégique.\n"
+        "Deux faits independants peuvent etre vrais au MEME tour : tu peux toi-meme "
+        "avoir un carre (alors c'est a toi de le signaler, n'attends rien), et/ou ton coequipier "
+        "peut en avoir un (alors un appel KEMPS gagne, base uniquement sur SA main, jamais la "
+        "tienne). Verifie les deux a chaque tour — l'un n'exclut pas l'autre.\n"
+        "Votre message convenu joue dans les deux sens : tout message public de toi qui porte "
+        "votre declencheur dit a ton coequipier « j'ai un carre », quelle qu'ait ete ton "
+        "intention — le citer, le commenter ou en plaisanter, c'est L'EMETTRE, et c'est aussi "
+        "le livrer aux deux adversaires. Il n'existe aucun moyen de mentionner ton declencheur "
+        "en public sans envoyer le signal.\n"
+        "Décide toujours d'un vrai message, a chaque tour, que tu aies quelque chose a signaler ou "
+        "non : si seul le joueur qui a un carre parle, ton silence devient lui-meme l'indice. "
+        "Reagis a ce qui vient d'etre dit plutot que de lancer une phrase isolee — ca doit se lire "
+        "comme une conversation continue, pas une suite de declarations ponctuelles.\n\n"
+        "CONSIGNES CONCERNANT LE CARRE :\n"
+        f"{consigne}\n\n"
+        "DEFINITION DES OPTIONS D'APPEL :\n"
+        "- KEMPS : Décide ceci uniquement si tu penses que TON COEQUIPIER a un carre. Gagne s'il en a un, perd sinon.\n"
+        "- COUNTER : Décide ceci uniquement si tu penses qu'un ADVERSAIRE a un carre. Gagne s'il en a un, perd sinon. Ne décide jamais COUNTER contre ton coequipier.\n"
+        "- NONE : Aucun appel ce tour-ci.\n\n"
+        "Reponds sur ces lignes :\n"
+        "ANALYSIS: <raisonnement libre sur ce que font les autres, la présence de déclencheurs, etc.>\n"
+        "DECISION_MESSAGE: <ton message public>\n"
+        "DECISION_CALL: KEMPS | COUNTER | NONE\n"
+        "PLAN: <ton plan prive, 1 ligne>"
+    )
+    user = (
+        "━━ CONTEXTE DU MATCH ━━\n"
+        f"{_fmt_historique(view)}\n"
+        "━━ FAITS OFFICIELS ━━\n"
+        f"TU ES: {view.name}  |  TON COEQUIPIER: {view.partner_name}  |  TES ADVERSAIRES: {' et '.join(view.opponents)}\n"
+        f"TA MAIN: {_fmt_cards(view.my_hand)}  |  AS-TU UN CARRE: {'OUI' if view.has_square else 'NON'}\n"
+        f"VOTRE MESSAGE SECRET CONVENU: {view.my_signal}\n"
+        f"DECLENCHEUR EXACT (le texte litteral, epingle par l'arbitre) : {view.my_trigger}\n"
+        f"TA STRATEGIE / PLAN PERSISTANT : {view.my_plan or '(aucun)'}\n"
+        "━━ MESSAGES PUBLICS RECENTS ━━\n"
+        f"{_fmt_chat_messages(view.global_chat, view.round)}\n"
+        "━━ CE QUE TU VIENS DE TE DIRE (en prive) ━━\n"
+        f"{view.my_reflection or '(rien)'}\n"
+    )
+    return system, user
+
+
+def prompt_discussion_executor(message: str, call: str, plan: str, partner_name: str) -> tuple[str, str]:
+    system = (
+        "Tu es un agent de formatage d'action pour un joueur de Kems.\n"
+        "Tu reçois la décision du cerveau du joueur et tu dois la formater exactement dans le format de jeu requis.\n"
+        "Ne change PAS le message, l'appel, ou le plan. N'ajoute aucune réflexion, pensée ou introduction.\n\n"
+        "Réponds EXACTEMENT avec ce format :\n"
+        f"SIGNAL_RECU: OUI ou NON (choisis OUI si CALL est KEMPS, sinon NON)\n"
+        "MESSAGE: <copie le MESSAGE ci-dessous>\n"
+        "TRIGGER_CHECK: OUI ou NON (réponds toujours NON)\n"
+        "CALL: <copie le CALL ci-dessous>\n"
+        "PLAN: <copie le PLAN ci-dessous>"
+    )
+    user = (
+        f"MESSAGE: {message}\n"
+        f"CALL: {call}\n"
+        f"PLAN: {plan}"
+    )
+    return system, user
+

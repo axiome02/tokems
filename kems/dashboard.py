@@ -329,6 +329,7 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
                 "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
                 "kimi": bool(os.environ.get("KIMI_API_KEY")),
                 "github": bool(os.environ.get("GITHUB_TOKEN")),
+                "openrouter": bool(os.environ.get("OPENROUTER_API_KEY")),
             }
             return self._json(200, {"keys": keys})
         if self.path.startswith("/api/stats"):

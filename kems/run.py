@@ -15,6 +15,7 @@ from .llm.github import GithubModelsClient
 from .llm.kimi import KimiClient
 from .llm.mistral import MistralClient
 from .llm.openai import OpenAIClient
+from .llm.openrouter import OpenRouterClient
 from .i18n import t
 from .orchestrator import play_game
 from .transcript import rendre
@@ -45,7 +46,7 @@ def usage_summary(agents: dict) -> dict:
 CLIENTS = {
     "mistral": MistralClient, "gemini": GeminiClient,
     "gpt": OpenAIClient, "claude": ClaudeClient, "kimi": KimiClient,
-    "github": GithubModelsClient,
+    "github": GithubModelsClient, "openrouter": OpenRouterClient,
 }
 
 

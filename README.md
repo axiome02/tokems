@@ -42,6 +42,14 @@ You can test top-tier models like **GPT-4o**, **GPT-4o-mini**, and **Claude 3.5 
   GITHUB_TOKEN=ghp_your_github_token_here
   ```
 
+### 🌐 Universal Key with OpenRouter (Alternative)
+You can query models from almost any provider (OpenAI, Anthropic, Google, Meta, Mistral...) using a single key from **OpenRouter** (openrouter.ai).
+- Add it to your `.env` file:
+  ```env
+  OPENROUTER_API_KEY=your_openrouter_api_key
+  ```
+- Use `openrouter` as your player provider, and select or input the model ID (e.g. `meta-llama/llama-3.1-8b-instruct:free`).
+
 ### Other Providers
 If you have paid API keys, you can also fill in:
 ```env
@@ -109,3 +117,15 @@ kems/
 ├── i18n.py            Internationalization translations dictionary
 └── run.py             Command Line Interface (CLI)
 ```
+
+---
+
+## 6. Brain / Executor Agent Architecture
+
+To prevent cognitive override and reflexive errors (such as players calling KEMPS on accidental keyword emissions even when they planned not to), the discussion and calling phase is split into two isolated, sequential steps:
+
+1. **Strategic Brain**: Has access to the full chat log, the cards, and the secret trigger word. It performs the core logical analysis, plans, and makes a final decision on the message to send and whether to call `KEMPS` or `COUNTER`.
+2. **Formatting Executor**: Isolated from the chat log, cards, rules, and the secret trigger word. It only receives the raw decision from the Brain and formats it exactly into the game engine's syntax.
+
+This separation of concerns ensures that the formatting layer has no sémantical access to the trigger words, preventing reflexive false positives and ensuring strategic reasoning dominates.
+
