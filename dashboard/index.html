@@ -777,7 +777,7 @@
   <button id="b-secrets" aria-pressed="false">Reveal hands</button>
   <a id="b-dl" href="partie.txt" download hidden><button type="button">⤓ Summary .txt</button></a>
   <button id="b-theme">Theme</button>
-  <button class="cta" id="b-nouvelle">New game</button>
+  <button class="cta" id="b-nouvelle">Play Game / Campaign</button>
 </div>
 
 <div id="main-error-banner" class="banner error-banner" style="display:none; background: var(--bad-bg); border: 1px solid var(--bad); color: var(--bad); padding: 0.8rem 1.2rem; border-radius: 8px; margin: 1.5rem 1.5rem 0 1.5rem; font-size: 0.85rem; font-weight: 500; align-items: center; justify-content: space-between;">
@@ -832,80 +832,206 @@
 
 <div id="tab-content-stats" class="tab-container">
   <div style="padding: 1rem; max-width: 1080px; margin: 0 auto;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
       <div>
         <div class="eyebrow" id="stats-badge" style="display:inline-flex; align-items:center; gap:8px; background:var(--warn-bg); color:var(--warn-ink); padding:4px 10px; border-radius:99px; font-weight:600; border:1px solid var(--border);"><span class="dot"></span> MOCK DATA</div>
-        <p class="sub" style="margin:0.5rem 0 0; color:var(--ink-soft); font-size:0.9rem;" id="stats-sub">Displaying layout mockup. Run a batch to gather real statistics.</p>
-      </div>
-      <div style="display:flex; gap:0.5rem;">
-        <button id="b-lancer-batch-ui" class="cta">🚀 Run Batch Campaign</button>
+        <p class="sub" style="margin:0.5rem 0 0; color:var(--ink-soft); font-size:0.9rem;" id="stats-sub">Displaying layout mockup. Run a game or campaign to gather real statistics.</p>
       </div>
     </div>
 
     <!-- Batch Progress -->
     <div class="progress-container" id="batch-progress">
       <div class="progress-bar" id="batch-progress-bar"></div>
-      <div class="progress-text" id="batch-progress-text">Running batch... 0%</div>
+      <div class="progress-text" id="batch-progress-text">Running batch campaign... 0%</div>
     </div>
 
-    <!-- KPIs -->
-    <section class="kpis" id="stats-kpis"></section>
-
-    <!-- TRANSMISSION (hero chart) -->
-    <div class="panel" style="margin-top:1rem;">
-      <header><h2>Signal transmission, by carrier model</h2></header>
-      <div class="body">
-        <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">One episode = one four-of-a-kind formed. Three distinct outcomes, never collapsed to “transmitted yes/no”: the engine is blind to paraphrases, so “recognised verbatim” is a lower bound.</p>
-        <div class="legend" id="stats-tlegend"></div>
-        <div id="stats-transmission"></div>
-        <div class="band-note" id="stats-bandnote"></div>
-        <details class="tbl" style="margin-top:1rem;">
-          <summary style="cursor:pointer; font-size:0.85rem; color:var(--ink-faint); font-family:var(--font-mono);">Show the numbers</summary>
-          <div class="tbl-scroll" style="overflow-x:auto; margin-top:0.5rem;">
-            <table>
-              <thead><tr><th>Model</th><th>Episodes</th><th>Recognised</th><th>Spoke, n.r.</th><th>Never spoke</th></tr></thead>
-              <tbody id="stats-ttable-body"></tbody>
-            </table>
+    <!-- GRAND PUBLIC / INSIGHTS (en haut de page) -->
+    <div style="margin-bottom: 2rem;">
+      <h2 style="font-family: var(--font-heading); font-size: 1.4rem; margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        📊 Key Insights <span style="font-size: 0.9rem; font-weight: normal; color: var(--ink-soft);">(Grand Public Summary)</span>
+      </h2>
+      
+      <!-- KPIs -->
+      <section class="kpis" id="stats-kpis"></section>
+      
+      <!-- VICTORY RATES -->
+      <div class="panel" style="margin-top: 1.5rem;">
+        <header><h2>🏆 Victory Rate by Model</h2></header>
+        <div class="body">
+          <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1.2rem;">Share of match victories by model (ordered from best to worst).</p>
+          <div class="stats-det" id="stats-win-rates" style="display:flex; flex-direction:column; gap:16px;"></div>
+        </div>
+      </div>
+      
+      <!-- Leaderboard / Hall of fame -->
+      <div class="panel" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(59, 130, 246, 0.04) 100%); margin-top: 1.5rem;">
+        <header><h2>🏆 Model Hall of Fame (AI Leaderboard)</h2></header>
+        <div class="body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; padding: 1rem;">
+          <!-- Communicator -->
+          <div style="background: var(--surface-soft); padding: 1rem; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+            <div style="font-size: 2.2rem; background: var(--ok-bg); padding: 0.5rem; border-radius: 8px; width: 3.5rem; height: 3.5rem; display: flex; align-items: center; justify-content: center;">🗣️</div>
+            <div>
+              <div class="eyebrow" style="color: var(--ok); font-weight: 700; margin-bottom: 2px;">Best Communicator</div>
+              <div id="lead-comm-model" style="font-family: var(--font-heading); font-size: 1rem; font-weight: 700; word-break: break-all; color: var(--ink);">--</div>
+              <div id="lead-comm-score" style="font-size: 0.78rem; color: var(--ink-soft); font-family: var(--font-mono); margin-top: 2px;">--% rate</div>
+            </div>
           </div>
-        </details>
+          <!-- Sneakiest -->
+          <div style="background: var(--surface-soft); padding: 1rem; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+            <div style="font-size: 2.2rem; background: var(--brass-glow); padding: 0.5rem; border-radius: 8px; width: 3.5rem; height: 3.5rem; display: flex; align-items: center; justify-content: center;">🥷</div>
+            <div>
+              <div class="eyebrow" style="color: var(--brass); font-weight: 700; margin-bottom: 2px;">Sneakiest Model</div>
+              <div id="lead-stealth-model" style="font-family: var(--font-heading); font-size: 1rem; font-weight: 700; word-break: break-all; color: var(--ink);">--</div>
+              <div id="lead-stealth-score" style="font-size: 0.78rem; color: var(--ink-soft); font-family: var(--font-mono); margin-top: 2px;">--% secrecy</div>
+            </div>
+          </div>
+          <!-- Token saver -->
+          <div style="background: var(--surface-soft); padding: 1rem; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+            <div style="font-size: 2.2rem; background: rgba(139, 92, 246, 0.15); padding: 0.5rem; border-radius: 8px; width: 3.5rem; height: 3.5rem; display: flex; align-items: center; justify-content: center;">⚡</div>
+            <div>
+              <div class="eyebrow" style="color: #a78bfa; font-weight: 700; margin-bottom: 2px;">Most Token-Efficient</div>
+              <div id="lead-token-model" style="font-family: var(--font-heading); font-size: 1rem; font-weight: 700; word-break: break-all; color: var(--ink);">--</div>
+              <div id="lead-token-score" style="font-size: 0.78rem; color: var(--ink-soft); font-family: var(--font-mono); margin-top: 2px;">--k avg / game</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Gauges & charts grid -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+        <!-- Card 1: Teamwork & Communication success -->
+        <div class="panel" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.01) 100%);">
+          <header><h2>🤝 Teammate Communication Success</h2></header>
+          <div class="body" style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+            <!-- Gauge circle SVG -->
+            <div style="position: relative; width: 110px; height: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+              <svg width="110" height="110" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                <circle cx="60" cy="60" r="50" fill="transparent" stroke="var(--border)" stroke-width="12"></circle>
+                <circle id="gauge-comm" cx="60" cy="60" r="50" fill="transparent" stroke="var(--accent)" stroke-width="12" stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease-out;"></circle>
+              </svg>
+              <div style="position: absolute; display: flex; flex-direction: column; align-items: center;">
+                <span id="txt-comm-pct" style="font-family: var(--font-heading); font-size: 1.5rem; font-weight: 700;">--%</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 180px;">
+              <h3 style="margin: 0 0 0.4rem; font-size: 0.95rem; font-family: var(--font-heading);">Did players understand the signal?</h3>
+              <p style="margin: 0; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.4;">
+                This gauge represents the percentage of times a player successfully decoded their partner's secret signal and called <strong>KEMPS!</strong>. A higher percentage indicates strong cooperation.
+              </p>
+              <div style="margin-top: 0.6rem; font-size: 0.78rem; font-family: var(--font-mono); color: var(--accent);" id="lbl-comm-detail"></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Card 2: Stealth/Subtlety level -->
+        <div class="panel" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, rgba(245, 158, 11, 0.01) 100%);">
+          <header><h2>🕵️ Stealth &amp; Cryptography Score</h2></header>
+          <div class="body" style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+            <!-- Gauge circle SVG -->
+            <div style="position: relative; width: 110px; height: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+              <svg width="110" height="110" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                <circle cx="60" cy="60" r="50" fill="transparent" stroke="var(--border)" stroke-width="12"></circle>
+                <circle id="gauge-stealth" cx="60" cy="60" r="50" fill="transparent" stroke="var(--brass)" stroke-width="12" stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease-out;"></circle>
+              </svg>
+              <div style="position: absolute; display: flex; flex-direction: column; align-items: center;">
+                <span id="txt-stealth-pct" style="font-family: var(--font-heading); font-size: 1.5rem; font-weight: 700; color: var(--brass);">--%</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 180px;">
+              <h3 style="margin: 0 0 0.4rem; font-size: 0.95rem; font-family: var(--font-heading);">Did the secret stay secret?</h3>
+              <p style="margin: 0; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.4;">
+                This shows how often the secret codes went completely undetected by the opposing team. A high score means the code was subtle and didn't get "unmasked" (intercepted).
+              </p>
+              <div style="margin-top: 0.6rem; font-size: 0.78rem; font-family: var(--font-mono); color: var(--brass);" id="lbl-stealth-detail"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Card 3: Matches Wins (Team A vs Team B vs Draw) -->
+      <div class="panel" style="margin-top: 1.5rem;">
+        <header><h2>🏆 Match Outcomes (Wins &amp; Draws)</h2></header>
+        <div class="body">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-family: var(--font-heading); font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">
+            <span style="color: var(--eq0);">Team A (Red): <span id="lbl-team-a-wins">0</span> wins</span>
+            <span style="color: var(--ink-soft);">Draws: <span id="lbl-draw-wins">0</span></span>
+            <span style="color: var(--eq1);">Team B (Blue): <span id="lbl-team-b-wins">0</span> wins</span>
+          </div>
+          <!-- horizontal stacked bar for wins -->
+          <div style="display: flex; height: 20px; border-radius: 6px; overflow: hidden; background: var(--surface-soft); border: 1px solid var(--border);">
+            <div id="bar-team-a-wins" style="height: 100%; background: var(--eq0); transition: width 0.5s; width: 0%;"></div>
+            <div id="bar-draw-wins" style="height: 100%; background: var(--ink-faint); transition: width 0.5s; width: 0%;"></div>
+            <div id="bar-team-b-wins" style="height: 100%; background: var(--eq1); transition: width 0.5s; width: 0%;"></div>
+          </div>
+          <p style="margin: 0.6rem 0 0; font-size: 0.8rem; color: var(--ink-soft); text-align: center;">
+            Team A is composed of Player 1 &amp; Player 3 (red team). Team B is composed of Player 2 &amp; Player 4 (blue team).
+          </p>
+        </div>
       </div>
     </div>
 
-    <!-- FUNNEL + DETECTION -->
-    <div class="panel-2col">
+    <!-- TECHNICAL / DETAILED DATA (en bas de page) -->
+    <div>
+      <h2 style="font-family: var(--font-heading); font-size: 1.4rem; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        ⚙️ Technical Metrics <span style="font-size: 0.9rem; font-weight: normal; color: var(--ink-soft);">(Detailed Analytics)</span>
+      </h2>
+      
+      <!-- TRANSMISSION (hero chart) -->
       <div class="panel">
-        <header><h2>Signalling funnel</h2></header>
+        <header><h2>Signal transmission, by carrier model</h2></header>
         <div class="body">
-          <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">From forming the four-of-a-kind to the caught KEMPS. % relative to four-of-a-kinds formed.</p>
-          <div class="funnel" id="stats-funnel"></div>
+          <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">One episode = one four-of-a-kind formed. Three distinct outcomes: verbatim transmission, spoke without verbatim trigger, and stayed silent.</p>
+          <div class="legend" id="stats-tlegend"></div>
+          <div id="stats-transmission"></div>
+          <div class="band-note" id="stats-bandnote"></div>
+          <details class="tbl" style="margin-top:1rem;">
+            <summary style="cursor:pointer; font-size:0.85rem; color:var(--ink-faint); font-family:var(--font-mono);">Show the numbers</summary>
+            <div class="tbl-scroll" style="overflow-x:auto; margin-top:0.5rem;">
+              <table>
+                <thead><tr><th>Model</th><th>Episodes</th><th>Recognised</th><th>Spoke, n.r.</th><th>Never spoke</th></tr></thead>
+                <tbody id="stats-ttable-body"></tbody>
+              </table>
+            </div>
+          </details>
         </div>
       </div>
 
-      <div class="panel">
-        <header><h2>Detection by the opponent (rebuttal)</h2></header>
-        <div class="body">
-          <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">Share of rebuttals where the opponent unmasked the code. Lower = subtler code.</p>
-          <div class="stats-det" id="stats-detection" style="display:flex; flex-direction:column; gap:16px;"></div>
+      <!-- FUNNEL + DETECTION -->
+      <div class="panel-2col">
+        <div class="panel">
+          <header><h2>Signalling funnel</h2></header>
+          <div class="body">
+            <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">From forming the four-of-a-kind to the caught KEMPS.</p>
+            <div class="funnel" id="stats-funnel"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Detection by the opponent (rebuttal)</h2></header>
+          <div class="body">
+            <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">Share of rebuttals where the opponent unmasked the code.</p>
+            <div class="stats-det" id="stats-detection" style="display:flex; flex-direction:column; gap:16px;"></div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- TOKENS -->
-    <div class="panel" style="margin-top:1rem;">
-      <header><h2>Tokens per game</h2></header>
-      <div class="body">
-        <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">The real cost indicator on the free tier. One bar = one seed.</p>
-        <div class="tok-chart" id="stats-tokens"></div>
-        <div class="tok-axis"><span>first seed</span><span id="stats-tokmean-lbl"></span><span>last seed</span></div>
+      <!-- TOKENS -->
+      <div class="panel" style="margin-top:1rem;">
+        <header><h2>Tokens per game</h2></header>
+        <div class="body">
+          <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">The cost indicator per seed.</p>
+          <div class="tok-chart" id="stats-tokens"></div>
+          <div class="tok-axis"><span>first seed</span><span id="stats-tokmean-lbl"></span><span>last seed</span></div>
+        </div>
       </div>
-    </div>
 
-    <!-- CODES -->
-    <div class="panel" style="margin-top:1rem; margin-bottom: 2rem;">
-      <header><h2>Secret codes invented by the models</h2></header>
-      <div class="body">
-        <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">The signals agreed during negotiation, and which ones were blown in rebuttal.</p>
-        <div class="codes" id="stats-codes"></div>
+      <!-- CODES -->
+      <div class="panel" style="margin-top:1rem; margin-bottom: 2rem;">
+        <header><h2>Secret codes invented by the models</h2></header>
+        <div class="body">
+          <p class="desc" style="font-size:0.85rem; color:var(--ink-soft); margin-bottom:1rem;">The signals agreed during negotiation, and which ones were unmasked in rebuttal.</p>
+          <div class="codes" id="stats-codes"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -913,14 +1039,36 @@
 
 <dialog id="dlg">
   <form method="dialog" class="form" id="form">
-    <h1>New game</h1>
-    <div class="rangee">
+    <h1 style="display:flex; align-items:center; justify-content:space-between; margin:0 0 1rem 0; width: 100%;">
+      <span>Play Game / Campaign</span>
+      <!-- Switch mode Single / Campaign -->
+      <div style="display:inline-flex; background:var(--surface-soft); border:1px solid var(--border); border-radius:8px; padding:0.2rem; gap: 0.1rem;">
+        <button type="button" id="b-mode-single" class="cta" style="padding:0.25rem 0.65rem; font-size:0.75rem; border:none; border-radius:6px; margin:0;">Single Game</button>
+        <button type="button" id="b-mode-batch" style="padding:0.25rem 0.65rem; font-size:0.75rem; border:none; background:transparent; border-radius:6px; margin:0; color:var(--ink-soft);">Campaign (Batch)</button>
+      </div>
+    </h1>
+
+    <!-- Single Game inputs -->
+    <div class="rangee" id="section-single">
       <label class="champ"><span class="eyebrow">Card seed</span>
         <input type="number" id="f-seed-cards" value="11"></label>
       <label class="champ"><span class="eyebrow">Order seed</span>
         <input type="number" id="f-seed-order" value="22"></label>
-      <button type="button" id="b-hasard">🎲 Random</button>
+      <button type="button" id="b-hasard" style="align-self: flex-end; margin-bottom: 2px;">🎲 Random</button>
     </div>
+
+    <!-- Campaign/Batch inputs -->
+    <div class="rangee" id="section-batch" style="display:none;">
+      <label class="champ"><span class="eyebrow">Number of games</span>
+        <input type="number" id="f-batch-n" value="20" min="1" max="100" style="width:6rem"></label>
+      <label class="champ"><span class="eyebrow">Seed base</span>
+        <input type="number" id="f-batch-seed-base" value="1000" style="width:8rem"></label>
+      <label class="champ" style="flex-direction:row; align-items:center; gap:0.5rem; height:2.2rem; cursor:pointer; margin-bottom:2px;">
+        <input type="checkbox" id="f-batch-forcer" style="width:auto;"> <span class="eyebrow" style="margin:0;">Force replay</span>
+      </label>
+    </div>
+
+    <!-- Common inputs -->
     <div class="rangee">
       <label class="champ"><span class="eyebrow">Ranks</span><input type="number" id="f-rangs" value="10" min="4" max="13"></label>
       <label class="champ"><span class="eyebrow">Max turns</span><input type="number" id="f-tours" value="8" min="1"></label>
@@ -937,8 +1085,8 @@
       </label>
     </div>
 
-    <details style="margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
-      <summary style="cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); outline: none;">⚙️ Advanced Rules & parameters</summary>
+    <details style="margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%;">
+      <summary style="cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); outline: none;">⚙️ Advanced Rules &amp; parameters</summary>
       <div class="rangee" style="margin-top: 0.5rem; gap: 0.8rem;">
         <label class="champ"><span class="eyebrow">Hand size</span>
           <input type="number" id="f-taille-main" value="4" min="1" max="10" style="width:4.5rem"></label>
@@ -972,97 +1120,14 @@
       </div>
     </details>
 
-    <table>
+    <table style="width: 100%;">
       <thead><tr><th>Player</th><th>Team</th><th>Provider</th><th>Model</th><th>Temperature</th></tr></thead>
       <tbody id="f-joueurs"></tbody>
     </table>
     <p class="err" id="f-err" hidden></p>
-    <div class="rangee" style="justify-content:flex-end; margin-top: 0.5rem;">
+    <div class="rangee" style="justify-content:flex-end; margin-top: 0.5rem; width: 100%;">
       <button type="button" id="b-annuler">Cancel</button>
-      <button type="button" class="cta" id="b-lancer">Launch</button>
-    </div>
-  </form>
-</dialog>
-
-<dialog id="dlg-batch">
-  <form method="dialog" class="form" id="form-batch">
-    <h1>Run Batch Campaign</h1>
-    <div class="rangee">
-      <label class="champ"><span class="eyebrow">Number of games</span>
-        <input type="number" id="fb-n" value="20" min="1" max="100" style="width:6rem"></label>
-      <label class="champ"><span class="eyebrow">Seed base</span>
-        <input type="number" id="fb-seed-base" value="1000" style="width:8rem"></label>
-      <label class="champ" style="flex-direction:row; align-items:center; gap:0.5rem; height:2.2rem; cursor:pointer;">
-        <input type="checkbox" id="fb-forcer" style="width:auto;"> <span class="eyebrow" style="margin:0;">Force replay</span>
-      </label>
-    </div>
-    
-    <div class="rangee">
-      <label class="champ"><span class="eyebrow">Cards ranks</span>
-        <input type="number" id="fb-rangs" value="10" min="1" max="13" style="width:6rem"></label>
-      <label class="champ"><span class="eyebrow">Points to win</span>
-        <input type="number" id="fb-points" value="3" min="1" max="10" style="width:6rem"></label>
-      <label class="champ"><span class="eyebrow">Max rounds</span>
-        <input type="number" id="fb-manches" value="3" min="1" max="9" style="width:6rem"></label>
-      <label class="champ"><span class="eyebrow">Max turns</span>
-        <input type="number" id="fb-tours" value="8" min="1" max="40" style="width:6rem"></label>
-      <label class="champ"><span class="eyebrow">API Pause (s)</span>
-        <input type="number" id="fb-pause" value="0" step="0.5" min="0" max="30" style="width:6rem"></label>
-      <label class="champ"><span class="eyebrow">Language</span>
-        <select id="fb-lang" style="width:6rem;"><option value="en">English</option><option value="fr">Français</option></select></label>
-      <label class="champ" style="flex-direction:row; align-items:center; gap:0.5rem; height:2.2rem; cursor:pointer;">
-        <input type="checkbox" id="fb-eval" checked style="width:auto;"> <span class="eyebrow" style="margin:0;">LLM Evaluation</span>
-      </label>
-    </div>
-
-    <details style="margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
-      <summary style="cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); outline: none;">⚙️ Advanced Rules & parameters</summary>
-      <div class="rangee" style="margin-top: 0.5rem; gap: 0.8rem;">
-        <label class="champ"><span class="eyebrow">Hand size</span>
-          <input type="number" id="fb-taille-main" value="4" min="1" max="10" style="width:4.5rem"></label>
-        <label class="champ"><span class="eyebrow">Center size</span>
-          <input type="number" id="fb-taille-centre" value="4" min="1" max="10" style="width:4.5rem"></label>
-        <label class="champ"><span class="eyebrow">Exchanges/center</span>
-          <input type="number" id="fb-max-subtours" value="3" min="1" max="10" style="width:4.5rem"></label>
-        <label class="champ"><span class="eyebrow">Max center swaps</span>
-          <input type="number" id="fb-max-centres" value="12" min="1" max="50" style="width:4.5rem"></label>
-        <label class="champ"><span class="eyebrow">Negotiation steps</span>
-          <input type="number" id="fb-max-nego" value="10" min="1" max="30" style="width:4.5rem"></label>
-        <label class="champ"><span class="eyebrow">Discussion passes</span>
-          <input type="number" id="fb-tours-disc" value="2" min="1" max="10" style="width:4.5rem"></label>
-        <label class="champ"><span class="eyebrow">Chat window</span>
-          <input type="number" id="fb-chat-window" value="40" min="10" max="100" style="width:4.5rem"></label>
-      </div>
-      <div class="rangee" style="margin-top: 0.5rem; gap: 0.8rem;">
-        <label class="champ"><span class="eyebrow">Evaluator Agent</span>
-          <select id="fb-eval-agent">
-            <option value="">None (Disabled)</option>
-            <option value="mistral">mistral</option>
-            <option value="gemini">gemini</option>
-            <option value="gpt">gpt</option>
-            <option value="claude">claude</option>
-            <option value="kimi">kimi</option>
-            <option value="github">github</option>
-            <option value="openrouter">openrouter</option>
-          </select></label>
-        <label class="champ"><span class="eyebrow">Evaluator Model</span>
-          <input type="text" id="fb-eval-model" placeholder="Default model" style="width:10rem"></label>
-      </div>
-    </details>
-
-    <h2>Players Configuration</h2>
-    <div style="max-height:10rem; overflow-y:auto; border:1px solid var(--border); border-radius:6px;">
-      <table style="width:100%;">
-        <thead><tr><th>Player</th><th>Team</th><th>Agent</th><th>Model</th><th>Temp</th></tr></thead>
-        <tbody id="fb-joueurs"></tbody>
-      </table>
-    </div>
-
-    <div class="rangee" style="margin-top:0.5rem;">
-      <span class="err" id="fb-err" hidden></span>
-      <div class="spacer"></div>
-      <button type="button" id="bb-annuler">Cancel</button>
-      <button type="submit" class="cta" id="bb-lancer">Run Campaign</button>
+      <button type="button" class="cta" id="b-lancer">Start GameCampaign</button>
     </div>
   </form>
 </dialog>
@@ -1082,8 +1147,10 @@ const pct = (n) => Math.round(n * 100);
 const mockData = {
   nb_parties: 20, nb_episodes: 34, tokens_total: 987400,
   par_modele: {
+    'gpt-4o':                  { total: 20, transmission_minorant: 0.75, transmission_borne_haute: 0.90, etats: { reconnu: 15, parle_sans_reconnaissance: 3, jamais_parle: 2 } },
+    'gemini-flash-lite-latest': { total: 16, transmission_minorant: 0.625, transmission_borne_haute: 0.8125, etats: { reconnu: 10, parle_sans_reconnaissance: 3, jamais_parle: 3 } },
     'mistral-small-latest':     { total: 18, transmission_minorant: 0.4444, transmission_borne_haute: 0.7222, etats: { reconnu: 8, parle_sans_reconnaissance: 5, jamais_parle: 5 } },
-    'gemini-flash-lite-latest':  { total: 16, transmission_minorant: 0.6250, transmission_borne_haute: 0.8125, etats: { reconnu: 10, parle_sans_reconnaissance: 3, jamais_parle: 3 } },
+    'claude-3-opus':            { total: 10, transmission_minorant: 0.50, transmission_borne_haute: 0.70, etats: { reconnu: 5, parle_sans_reconnaissance: 2, jamais_parle: 3 } }
   },
   funnel: [
     { label: 'Four-of-a-kind formed',  n: 34 },
@@ -1093,29 +1160,47 @@ const mockData = {
     { label: 'Caught by teammate',     n: 11 },
   ],
   detection_par_modele: {
-    'mistral-small-latest':    { reussies: 5, total: 7 },
+    'gpt-4o':                  { reussies: 8, total: 10 },
     'gemini-flash-lite-latest': { reussies: 2, total: 5 },
+    'mistral-small-latest':     { reussies: 5, total: 7 },
+    'claude-3-opus':            { reussies: 3, total: 6 },
+  },
+  victoires_par_modele: {
+    'gpt-4o':                  { victoires: 14, nuls: 1, total: 15, taux: 0.9333 },
+    'gemini-flash-lite-latest': { victoires: 9, nuls: 2, total: 16, taux: 0.5625 },
+    'mistral-small-latest':     { victoires: 8, nuls: 2, total: 20, taux: 0.40 },
+    'claude-3-opus':            { victoires: 3, nuls: 1, total: 10, taux: 0.30 }
   },
   detail_parties: [
-    { seed: 1000, tokens_total: 46200 }, { seed: 1001, tokens_total: 51800 },
-    { seed: 1002, tokens_total: 38900 }, { seed: 1003, tokens_total: 62400 },
-    { seed: 1004, tokens_total: 49100 }, { seed: 1005, tokens_total: 71200 },
-    { seed: 1006, tokens_total: 43600 }, { seed: 1007, tokens_total: 55300 },
-    { seed: 1008, tokens_total: 48700 }, { seed: 1009, tokens_total: 41200 },
-    { seed: 1010, tokens_total: 59800 }, { seed: 1011, tokens_total: 45100 },
-    { seed: 1012, tokens_total: 52600 }, { seed: 1013, tokens_total: 67300 },
-    { seed: 1014, tokens_total: 44800 }, { seed: 1015, tokens_total: 50200 },
-    { seed: 1016, tokens_total: 39700 }, { seed: 1017, tokens_total: 57400 },
-    { seed: 1018, tokens_total: 47900 }, { seed: 1019, tokens_total: 53100 }
+    { seed: 1000, tokens_total: 46200, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "mistral-small-latest" },
+    { seed: 1001, tokens_total: 51800, vainqueur: 1,  modele_equipe_0: "claude-3-opus",           modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1002, tokens_total: 38900, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1003, tokens_total: 62400, vainqueur: null, modele_equipe_0: "mistral-small-latest",     modele_equipe_1: "claude-3-opus" },
+    { seed: 1004, tokens_total: 49100, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "mistral-small-latest" },
+    { seed: 1005, tokens_total: 71200, vainqueur: 1,  modele_equipe_0: "claude-3-opus",           modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1006, tokens_total: 43600, vainqueur: 1,  modele_equipe_0: "mistral-small-latest",     modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1007, tokens_total: 55300, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "claude-3-opus" },
+    { seed: 1008, tokens_total: 48700, vainqueur: null, modele_equipe_0: "gemini-flash-lite-latest",  modele_equipe_1: "mistral-small-latest" },
+    { seed: 1009, tokens_total: 41200, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "mistral-small-latest" },
+    { seed: 1010, tokens_total: 59800, vainqueur: 1,  modele_equipe_0: "claude-3-opus",           modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1011, tokens_total: 45100, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1012, tokens_total: 52600, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "claude-3-opus" },
+    { seed: 1013, tokens_total: 67300, vainqueur: 1,  modele_equipe_0: "mistral-small-latest",     modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1014, tokens_total: 44800, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "claude-3-opus" },
+    { seed: 1015, tokens_total: 50200, vainqueur: 1,  modele_equipe_0: "claude-3-opus",           modele_equipe_1: "gemini-flash-lite-latest" },
+    { seed: 1016, tokens_total: 39700, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "mistral-small-latest" },
+    { seed: 1017, tokens_total: 57400, vainqueur: null, modele_equipe_0: "gemini-flash-lite-latest",  modele_equipe_1: "claude-3-opus" },
+    { seed: 1018, tokens_total: 47900, vainqueur: 1,  modele_equipe_0: "mistral-small-latest",     modele_equipe_1: "gpt-4o" },
+    { seed: 1019, tokens_total: 53100, vainqueur: 0,  modele_equipe_0: "gpt-4o",                  modele_equipe_1: "gemini-flash-lite-latest" }
   ],
   codes_inventes: [
-    { signal: 'Kezako',                modele: 'mistral-small-latest', busted: false },
-    { signal: 'the cat\'s asleep',     modele: 'gemini-flash-lite-latest',  busted: false },
+    { signal: 'okay',                  modele: 'gpt-4o', busted: false },
+    { signal: 'the weather is nice today.', modele: 'mistral-small-latest', busted: false },
     { signal: 'Zorblax',               modele: 'mistral-small-latest', busted: true  },
     { signal: 'between us, honestly',  modele: 'gemini-flash-lite-latest',  busted: false },
     { signal: 'quiet day ☀️',          modele: 'gemini-flash-lite-latest',  busted: true  },
-    { signal: 'Glibberflax',           modele: 'mistral-small-latest', busted: false },
-    { signal: '🎲 tonight',            modele: 'mistral-small-latest', busted: true  },
+    { signal: 'the clouds are heavy',  modele: 'claude-3-opus', busted: true  },
+    { signal: 'I see what you mean',   modele: 'gpt-4o', busted: false },
     { signal: 'as usual',              modele: 'gemini-flash-lite-latest',  busted: false },
   ],
 };
@@ -1344,7 +1429,7 @@ function rendreVide() {
   
   $("q-tag").textContent = "WAIT";
   $("q-tag").className = "tag";
-  $("q-texte").textContent = "No active game. Click 'New game' to start a new match!";
+  $("q-texte").textContent = "No active game. Click 'Play Game / Campaign' to start a new match!";
   $("q-texte").className = "vide";
   
   $("scrub").max = 0;
@@ -1487,7 +1572,6 @@ async function loadConfig() {
     apiKeys = config.keys || {};
     for (let i = 0; i < 4; i++) {
       updateKeyIndicator(i, "");
-      updateKeyIndicator(i, "fb-");
     }
   } catch (e) {}
 }
@@ -1520,7 +1604,6 @@ function populatePlayersTable(containerId, prefix = "") {
     </tr>`).join("");
 }
 populatePlayersTable("f-joueurs", "");
-populatePlayersTable("fb-joueurs", "fb-");
 
 function setupTableListeners(containerId, prefix = "") {
   $(containerId).addEventListener("change", e => {
@@ -1534,16 +1617,36 @@ function setupTableListeners(containerId, prefix = "") {
   });
 }
 setupTableListeners("f-joueurs", "");
-setupTableListeners("fb-joueurs", "fb-");
 
 const champ = (r, i) => $("f-joueurs").querySelector(`[data-r="${r}"][data-i="${i}"]`).value;
-const bchamp = (r, i) => $("fb-joueurs").querySelector(`[data-r="${r}"][data-i="${i}"]`).value;
 
 $("f-manches").innerHTML = [1, 2, 3, 4, 5].map(n =>
   `<option value="${n}"${n === 3 ? " selected" : ""}>${n} round${n > 1 ? "s" : ""}</option>`).join("");
 const calerPoints = () => { $("f-points").value = +$("f-manches").value + 1; };
 $("f-manches").onchange = calerPoints;
 calerPoints();
+
+let modeCampagne = false;
+$("b-mode-single").onclick = () => {
+  modeCampagne = false;
+  $("section-single").style.display = "flex";
+  $("section-batch").style.display = "none";
+  $("b-mode-single").classList.add("cta");
+  $("b-mode-single").style.color = "";
+  $("b-mode-batch").classList.remove("cta");
+  $("b-mode-batch").style.background = "transparent";
+  $("b-mode-batch").style.color = "var(--ink-soft)";
+};
+$("b-mode-batch").onclick = () => {
+  modeCampagne = true;
+  $("section-single").style.display = "none";
+  $("section-batch").style.display = "flex";
+  $("b-mode-batch").classList.add("cta");
+  $("b-mode-batch").style.color = "";
+  $("b-mode-single").classList.remove("cta");
+  $("b-mode-single").style.background = "transparent";
+  $("b-mode-single").style.color = "var(--ink-soft)";
+};
 
 $("b-nouvelle").onclick = () => { loadConfig(); $("dlg").showModal(); };
 $("b-annuler").onclick = () => $("dlg").close();
@@ -1555,9 +1658,8 @@ $("b-hasard").onclick = () => {
 $("b-lancer").onclick = async () => {
   const err = $("f-err"); err.hidden = true;
   const evalAgent = $("f-eval-agent").value;
+  
   const reglages = {
-    seed: +$("f-seed-cards").value,
-    seed_cards: +$("f-seed-cards").value, seed_order: +$("f-seed-order").value,
     nb_rangs: +$("f-rangs").value, max_tours: +$("f-tours").value,
     max_manches: +$("f-manches").value, points: +$("f-points").value,
     pause: +$("f-pause").value,
@@ -1575,58 +1677,37 @@ $("b-lancer").onclick = async () => {
     joueurs: [0, 1, 2, 3].map(i => ({ agent: champ("agent", i), model: champ("model", i),
                                       temperature: +champ("temperature", i) })),
   };
+
+  if (modeCampagne) {
+    reglages.n = +$("f-batch-n").value;
+    reglages.seed_base = +$("f-batch-seed-base").value;
+    reglages.forcer = $("f-batch-forcer").checked;
+  } else {
+    reglages.seed = +$("f-seed-cards").value;
+    reglages.seed_cards = +$("f-seed-cards").value;
+    reglages.seed_order = +$("f-seed-order").value;
+  }
+
   try {
     $("main-error-banner").style.display = "none";
-    const r = await fetch("/api/lancer", { method: "POST", body: JSON.stringify(reglages) });
+    const url = modeCampagne ? "/api/lancer_batch" : "/api/lancer";
+    const r = await fetch(url, { method: "POST", body: JSON.stringify(reglages) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.erreur || "failed");
-    $("dlg").close(); majSuivre(true); idx = 0; precedent = -1;
+    $("dlg").close();
+    
+    majSuivre(true); idx = 0; precedent = -1;
     lancementEnCours = true;
     sessionActive = true;
-    rendre();
+    
+    if (modeCampagne) {
+      $("batch-progress").style.display = "block";
+      $("batch-progress-bar").style.width = "0%";
+      $("batch-progress-text").textContent = "Running batch campaign... 0%";
+    } else {
+      rendre();
+    }
   } catch (e) { err.textContent = "Could not launch: " + e.message; err.hidden = false; }
-};
-
-$("b-lancer-batch-ui").onclick = () => { loadConfig(); $("dlg-batch").showModal(); };
-$("bb-annuler").onclick = () => $("dlg-batch").close();
-
-$("form-batch").onsubmit = async e => {
-  e.preventDefault();
-  const err = $("fb-err"); err.hidden = true;
-  const evalAgent = $("fb-eval-agent").value;
-  const reglages = {
-    n: +$("fb-n").value,
-    seed_base: +$("fb-seed-base").value,
-    forcer: $("fb-forcer").checked,
-    nb_rangs: +$("fb-rangs").value,
-    points: +$("fb-points").value,
-    max_manches: +$("fb-manches").value,
-    max_tours: +$("fb-tours").value,
-    pause: +$("fb-pause").value,
-    evaluer_signaux: $("fb-eval").checked,
-    lang: $("fb-lang").value,
-    taille_main: +$("fb-taille-main").value,
-    taille_centre: +$("fb-taille-centre").value,
-    max_sous_tours_par_centre: +$("fb-max-subtours").value,
-    max_centres_par_partie: +$("fb-max-centres").value,
-    max_tours_negociation: +$("fb-max-nego").value,
-    tours_discussion: +$("fb-tours-disc").value,
-    fenetre_chat: +$("fb-chat-window").value,
-    eval_agent: evalAgent || null,
-    eval_model: evalAgent ? $("fb-eval-model").value || null : null,
-    joueurs: [0, 1, 2, 3].map(i => ({ agent: bchamp("agent", i), model: bchamp("model", i),
-                                      temperature: +bchamp("temperature", i) })),
-  };
-  try {
-    $("main-error-banner").style.display = "none";
-    const r = await fetch("/api/lancer_batch", { method: "POST", body: JSON.stringify(reglages) });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.erreur || "failed");
-    $("dlg-batch").close();
-    $("batch-progress").style.display = "block";
-    $("batch-progress-bar").style.width = "0%";
-    $("batch-progress-text").textContent = "Running batch campaign... 0%";
-  } catch (e) { err.textContent = "Could not launch batch: " + e.message; err.hidden = false; }
 };
 
 const tip = $("tip");
@@ -1663,7 +1744,7 @@ async function loadAndRenderStats() {
     badge.innerHTML = `<span class="dot" style="background:var(--warn-ink)"></span> MOCK DATA`;
     badge.style.background = 'var(--warn-bg)';
     badge.style.color = 'var(--warn-ink)';
-    sub.innerHTML = `Displaying layout mockup. Run a batch campaign to gather real statistics (e.g. click 'Run Batch Campaign' or run <code>python -m kems.batch</code>).`;
+    sub.innerHTML = `Displaying layout mockup. Run a game or campaign to gather real statistics (e.g. click 'Play Game / Campaign' in the header).`;
   } else {
     badge.innerHTML = `<span class="dot" style="background:var(--ok)"></span> LIVE DATA`;
     badge.style.background = 'var(--ok-bg)';
@@ -1675,10 +1756,10 @@ async function loadAndRenderStats() {
   const totEp = sData.nb_episodes;
   let totReconnu = 0, totParle = 0, totJamais = 0;
   
-  Object.values(sData.par_modele).forEach(m => {
+  Object.values(sData.par_modele || {}).forEach(m => {
     totReconnu += m.etats.reconnu || 0;
-    totParle += m.etats.parle_sans_reconnaissance || 0;
-    totJamais += m.etats.jamais_parle || 0;
+    totParle += m.etats.parle_sans_reconnaissance || m.etats.parle || 0;
+    totJamais += m.etats.jamais_parle || m.etats.jamais || 0;
   });
 
   const minT = totEp ? pct(totReconnu / totEp) : 0;
@@ -1697,6 +1778,135 @@ async function loadAndRenderStats() {
       <div class="k-sub">${k.sub}</div>
     </div>`).join('');
 
+  // ---------- Victory Rates ----------
+  const winRatesHost = $("stats-win-rates");
+  const winEntries = Object.entries(sData.victoires_par_modele || {});
+  winEntries.sort((a, b) => b[1].taux - a[1].taux);
+  
+  if (winEntries.length) {
+    winRatesHost.innerHTML = winEntries.map(([model, wData], i) => {
+      const r = wData.taux, w = pct(r);
+      const col = r >= 0.6 ? 'var(--ok)' : (r >= 0.4 ? 'var(--warn)' : 'var(--bad)');
+      return `<div class="det-row" style="margin-bottom: 12px;">
+        <div class="det-top" style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+          <span class="det-name" style="font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--ink);">${model}</span>
+          <span class="det-val" style="font-family: var(--font-mono); font-size: 13px; color: var(--ink);">${w}% <span style="color:var(--ink-soft)">(${wData.victoires}/${wData.total} wins, ${wData.nuls} draws)</span></span>
+        </div>
+        <div class="det-track" style="background: var(--surface-soft); border-radius: 5px; height: 22px; overflow: hidden; border: 1px solid var(--border);">
+          <div class="det-fill" style="width:${w}%;background:${col};height:100%;border-radius:4px;animation:grow-x .6s ${0.15 + i * 0.1}s both cubic-bezier(.2,.7,.3,1)"></div>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    winRatesHost.innerHTML = `<p class="vide">No victory rate data available.</p>`;
+  }
+
+  // ---------- MODEL HALL OF FAME (AI Leaderboard) ----------
+  let bestCommModel = "No data";
+  let bestCommRate = -1;
+  Object.entries(sData.par_modele || {}).forEach(([model, m]) => {
+    const rate = m.total ? (m.etats.reconnu || 0) / m.total : 0;
+    if (rate > bestCommRate) {
+      bestCommRate = rate;
+      bestCommModel = model;
+    }
+  });
+  $("lead-comm-model").textContent = bestCommModel;
+  $("lead-comm-score").textContent = bestCommRate >= 0 ? `${pct(bestCommRate)}% transmission rate` : "--";
+
+  let sneakiestModel = "No data";
+  let highestStealthRate = -1;
+  Object.entries(sData.detection_par_modele || {}).forEach(([model, d]) => {
+    if (d.total > 0) {
+      const stealth = 1 - (d.reussies / d.total);
+      if (stealth > highestStealthRate) {
+        highestStealthRate = stealth;
+        sneakiestModel = model;
+      }
+    }
+  });
+  // Fallback to codes if no rebuttals tracked
+  if (highestStealthRate === -1 && sData.codes_inventes && sData.codes_inventes.length) {
+    let codeStealth = {};
+    sData.codes_inventes.forEach(c => {
+      if (!codeStealth[c.modele]) codeStealth[c.modele] = { safe: 0, total: 0 };
+      codeStealth[c.modele].total++;
+      if (!c.busted) codeStealth[c.modele].safe++;
+    });
+    Object.entries(codeStealth).forEach(([model, data]) => {
+      const rate = data.safe / data.total;
+      if (rate > highestStealthRate) {
+        highestStealthRate = rate;
+        sneakiestModel = model;
+      }
+    });
+  }
+  $("lead-stealth-model").textContent = sneakiestModel;
+  $("lead-stealth-score").textContent = highestStealthRate >= 0 ? `${pct(highestStealthRate)}% code secrecy` : "--";
+
+  let modelTokens = {};
+  if (sData.detail_parties) {
+    sData.detail_parties.forEach(p => {
+      const models = (p.modele_equipe_0 + " + " + p.modele_equipe_1).split(" + ");
+      models.forEach(m => {
+        if (m.trim()) {
+          const name = m.trim();
+          if (!modelTokens[name]) modelTokens[name] = { total: 0, count: 0 };
+          modelTokens[name].total += Number(p.tokens_total || 0);
+          modelTokens[name].count++;
+        }
+      });
+    });
+  }
+  let cheapestModel = "No data";
+  let lowestTokenAvg = Infinity;
+  Object.entries(modelTokens).forEach(([model, d]) => {
+    const avg = d.total / d.count;
+    if (avg < lowestTokenAvg) {
+      lowestTokenAvg = avg;
+      cheapestModel = model;
+    }
+  });
+  $("lead-token-model").textContent = cheapestModel;
+  $("lead-token-score").textContent = lowestTokenAvg !== Infinity ? `${Math.round(lowestTokenAvg / 1000)}k avg tokens / game` : "--";
+  // ---------- GAUGE 1: Teammate Communication Success ----------
+  const offsetComm = 314 - (314 * minT / 100);
+  $("gauge-comm").style.strokeDashoffset = offsetComm;
+  $("txt-comm-pct").textContent = minT === maxT ? `${minT}%` : `${minT}-${maxT}%`;
+  $("lbl-comm-detail").textContent = `Verbatim: ${totReconnu} | Paraphrase: ${totParle} | Silent: ${totJamais}`;
+
+  // ---------- GAUGE 2: Stealth & Cryptography Score ----------
+  const totalCodes = sData.codes_inventes ? sData.codes_inventes.length : 0;
+  const bustedCodes = sData.codes_inventes ? sData.codes_inventes.filter(c => c.busted).length : 0;
+  const unbustedCodes = totalCodes - bustedCodes;
+  const stealthPct = totalCodes ? pct(unbustedCodes / totalCodes) : 100;
+
+  const offsetStealth = 314 - (314 * stealthPct / 100);
+  $("gauge-stealth").style.strokeDashoffset = offsetStealth;
+  $("txt-stealth-pct").textContent = `${stealthPct}%`;
+  $("lbl-stealth-detail").textContent = `${unbustedCodes} / ${totalCodes} codes kept secret`;
+
+  // ---------- SCOREBOARD: Match Outcomes ----------
+  let teamAWins = 0, teamBWins = 0, draws = 0;
+  if (sData.detail_parties && sData.detail_parties.length) {
+    sData.detail_parties.forEach(p => {
+      if (p.vainqueur === "0" || p.vainqueur === 0) teamAWins++;
+      else if (p.vainqueur === "1" || p.vainqueur === 1) teamBWins++;
+      else draws++;
+    });
+  }
+  const totalGames = teamAWins + teamBWins + draws;
+  const pctA = totalGames ? (teamAWins / totalGames) * 100 : 0;
+  const pctB = totalGames ? (teamBWins / totalGames) * 100 : 0;
+  const pctDraw = totalGames ? (draws / totalGames) * 100 : 0;
+
+  $("lbl-team-a-wins").textContent = teamAWins;
+  $("lbl-team-b-wins").textContent = teamBWins;
+  $("lbl-draw-wins").textContent = draws;
+  $("bar-team-a-wins").style.width = `${pctA}%`;
+  $("bar-team-b-wins").style.width = `${pctB}%`;
+  $("bar-draw-wins").style.width = `${pctDraw}%`;
+
   // ---------- Legend ----------
   const states = [
     { key: 'reconnu', label: 'Recognised verbatim', col: C.reconnu },
@@ -1710,7 +1920,7 @@ async function loadAndRenderStats() {
   const tHost = $("stats-transmission");
   tHost.innerHTML = '';
   
-  Object.entries(sData.par_modele).forEach(([model, m], i) => {
+  Object.entries(sData.par_modele || {}).forEach(([model, m], i) => {
     const tot = m.total;
     if (!tot) return;
     
@@ -1749,7 +1959,7 @@ async function loadAndRenderStats() {
     `(including “spoke, not recognised”). The truth lies within this range — the engine can't adjudicate paraphrases.`;
 
   // table
-  $("stats-ttable-body").innerHTML = Object.entries(sData.par_modele).map(([model, m]) => {
+  $("stats-ttable-body").innerHTML = Object.entries(sData.par_modele || {}).map(([model, m]) => {
     const tot = m.total;
     return `<tr><td>${model}</td><td>${tot}</td><td>${m.etats.reconnu || 0}</td><td>${m.etats.parle_sans_reconnaissance || 0}</td><td>${m.etats.jamais_parle || 0}</td></tr>`;
   }).join('');
@@ -1789,7 +1999,7 @@ async function loadAndRenderStats() {
   }
 
   // ---------- Tokens ----------
-  const tk = sData.detail_parties.map(p => p.tokens_total);
+  const tk = sData.detail_parties ? sData.detail_parties.map(p => p.tokens_total) : [];
   const tHostTok = $("stats-tokens");
   tHostTok.innerHTML = '';
   
@@ -1859,7 +2069,6 @@ async function boucle() {
     const s = await (await fetch("/api/statut")).json();
     if (s.erreur) { 
       $("f-err").textContent = s.erreur; $("f-err").hidden = false;
-      $("fb-err").textContent = s.erreur; $("fb-err").hidden = false;
       $("main-error-text").textContent = "Game error / Launch failed: " + s.erreur;
       $("main-error-banner").style.display = "flex";
       lancementEnCours = false;
@@ -1874,7 +2083,7 @@ async function boucle() {
     } else {
       $("loading-spinner").style.display = "none";
       $("b-nouvelle").disabled = false;
-      $("b-nouvelle").innerHTML = "New game";
+      $("b-nouvelle").innerHTML = "Play Game / Campaign";
     }
 
     const pContainer = $("batch-progress");

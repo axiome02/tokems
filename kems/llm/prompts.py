@@ -41,13 +41,5 @@ def prompt_discussion_executor(message: str, call: str, plan: str, partner_name:
     return _mod(lang).prompt_discussion_executor(message, call, plan, partner_name)
 
 
-def prompt_riposte(view: PlayerView, lang: str = "en") -> tuple[str, str]:
-    return _mod(lang).prompt_riposte(view)
-
-
 def prompt_judge_signal(convention: str, trigger: str, text: str, lang: str = "en") -> tuple[str, str]:
     return _mod(lang).prompt_judge_signal(convention, trigger, text)
-
-
-def prompt_judge_riposte(convention: str, trigger: str, response: str, lang: str = "en") -> tuple[str, str]:
-    return _mod(lang).prompt_judge_riposte(convention, trigger, response)

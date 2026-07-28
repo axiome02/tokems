@@ -191,10 +191,9 @@ def resolve_calls(state: GameState, calls: dict[int, Call], order: list[int]) ->
             ep = _episode(state, partner)
             if ep is not None:
                 ep["kemps_turn"], ep["caught"] = state.turn, success
+                if success:
+                    ep["unmasked"] = False
             state.finished = True
-            # last resort for the team that conceded: unmask the opposing signal
-            if success:
-                state.comeback_team = 1 - team
             return
 
         if call.kind == "COUNTER":
@@ -208,61 +207,13 @@ def resolve_calls(state: GameState, calls: dict[int, Call], order: list[int]) ->
                 "caller": pid, "kind": "COUNTER", "success": success,
             }
             _log(state, "CALL", pid, t(lang, "counter_call_success" if success else "counter_call_fail", nom=name))
+            if success:
+                for p in holders:
+                    ep = _episode(state, p)
+                    if ep is not None:
+                        ep["unmasked"] = True
             state.finished = True
             return
-
-
-def resolve_comeback(state: GameState, responses: dict[int, str],
-                     responses_found: dict[int, bool] | None = None) -> None:
-    """Comeback (riposte): the team that just conceded a KEMPS names the opposing signal.
-
-    If either of its two players unmasks it, they reverse the result and win.
-    Arbitration relies on the pre-evaluated results provided (e.g. by an LLM Judge),
-    or falls back on literal detection.
-    """
-    lang = state.config.lang
-    team = state.comeback_team
-    state.comeback_team = None
-    if team is None or state.outcome is None:
-        return
-
-    opposing_signal = state.signals.get(1 - team, "")
-    opposing_trigger = state.triggers.get(1 - team, "")
-    attempts = []
-    winner: int | None = None
-    for pid in state.team_players(team):
-        response = (responses.get(pid) or "").strip()
-        
-        if responses_found is not None:
-            found = responses_found.get(pid, False)
-        else:
-            found = (signal_found(opposing_signal, response)
-                     or signal_found(opposing_trigger, response))
-                      
-        attempts.append({"pid": pid, "response": response, "found": found})
-        _log(state, "RIPOSTE", pid,
-             t(lang, "riposte_attempt_unmasked" if found else "riposte_attempt_wrong",
-               nom=state.players[pid].name, reponse=response or t(lang, "nothing")))
-        if found and winner is None:
-            winner = pid
-
-    for e in state.episodes:
-        if e["round"] == state.round and state.team_of(e["pid"]) != team:
-            e["unmasked"] = winner is not None
-    state.outcome["riposte"] = {
-        "team": team,
-        "opposing_signal": opposing_signal,
-        "attempts": attempts,
-        "success": winner is not None,
-    }
-    if winner is not None:
-        state.outcome["winner_team"] = team
-        state.outcome["reason"] = t(lang, "riposte_success_reason",
-                                    nom=state.players[winner].name, signal=opposing_signal)
-        _log(state, "SYSTEM", None, t(lang, "riposte_success_log", equipe=team))
-    else:
-        # NEVER write the real signal here: the chat is public and the match continues
-        _log(state, "SYSTEM", None, t(lang, "riposte_fail_log"))
 
 
 def check_end(state: GameState) -> None:
@@ -276,18 +227,15 @@ def check_end(state: GameState) -> None:
 
 
 def signal_burned(state: GameState, team: int) -> bool:
-    """Was the team's signal just unmasked (successful comeback in the elapsed round)?"""
+    """Was the team's signal just unmasked (successful COUNTER by opponents in the elapsed round)?"""
     if not state.round_history:
         return False
-    r = state.round_history[-1].get("riposte")
-    return bool(r and r["success"] and r["team"] == 1 - team)
+    o = state.round_history[-1]
+    return bool(o.get("kind") == "COUNTER" and o.get("success") and o.get("winner_team") == 1 - team)
 
 
 def close_round(state: GameState) -> None:
-    """Attributes the point of the round and determines if the match is finished.
-
-    To be called AFTER the optional comeback attempt, as it can reverse the winner.
-    """
+    """Attributes the point of the round and determines if the match is finished."""
     lang = state.config.lang
     o = state.outcome or {"winner_team": None, "reason": t(lang, "manche_no_result")}
     winner = o.get("winner_team")

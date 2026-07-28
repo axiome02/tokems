@@ -27,8 +27,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "center_swept": "Center swept -> {cartes}",
         "reflecting": "{nom} is thinking",
         "says": '{nom}: "{msg}"',
-        "riposte_intro": "COMEBACK: team {equipe} must name the opponents' secret signal to turn the match around",
-        "riposte_attempt": "{nom} attempts to unmask the opponents' code",
+
         "yes_word": "YES",
         "no_word": "NO",
         "signal_burned_notice": (
@@ -45,11 +44,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "counter_success": "COUNTER succeeded",
         "counter_fail": "COUNTER failed (opponents had no square)",
         "nothing": "(nothing)",
-        "riposte_attempt_unmasked": '{nom} counters: the opponents\' signal might be "{reponse}" -> UNMASKED',
-        "riposte_attempt_wrong": '{nom} counters: the opponents\' signal might be "{reponse}" -> wrong',
-        "riposte_success_reason": 'Opponents\' KEMPS taken, but the comeback worked: {nom} unmasked the signal "{signal}"',
-        "riposte_success_log": "Comeback succeeded -> team {equipe} turns the match around and WINS",
-        "riposte_fail_log": "Comeback failed -> the opponents' signal stays intact",
+
         "manche_null": "Round drawn (limit reached, no call)",
         "manche_no_result": "Round with no result",
         "manche_end_log": "End of round {manche} ({fin}) — score: {score}",
@@ -89,7 +84,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "draw_word": "draw",
         "team_word": "team {equipe}",
         "manche_result_line": "Round {manche}: {qui} — {reason}",
-        "riposte_recap": 'team {equipe}\'s comeback attempt (had to name: "{signal}"):',
+
         "attempt_line": '{nom}: "{reponse}" -> {verdict}',
         "unmasked_word": "UNMASKED",
         "wrong_word": "wrong",
@@ -133,8 +128,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "center_swept": "Centre balaye -> {cartes}",
         "reflecting": "{nom} reflechit",
         "says": "{nom} : « {msg} »",
-        "riposte_intro": "RIPOSTE : l'equipe {equipe} doit nommer le signal secret adverse pour renverser la partie",
-        "riposte_attempt": "{nom} tente de demasquer le code adverse",
+
         "yes_word": "OUI",
         "no_word": "NON",
         "signal_burned_notice": (
@@ -150,11 +144,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "counter_success": "COUNTER reussi",
         "counter_fail": "COUNTER rate (adverse sans carre)",
         "nothing": "(rien)",
-        "riposte_attempt_unmasked": "{nom} riposte : le signal adverse serait « {reponse} » -> DEMASQUE",
-        "riposte_attempt_wrong": "{nom} riposte : le signal adverse serait « {reponse} » -> faux",
-        "riposte_success_reason": "KEMPS adverse encaisse, mais riposte reussie : {nom} a demasque le signal « {signal} »",
-        "riposte_success_log": "Riposte reussie -> l'equipe {equipe} renverse la partie et GAGNE",
-        "riposte_fail_log": "Riposte manquee -> le signal adverse reste intact",
+
         "manche_null": "Manche nulle (limite atteinte, aucun appel)",
         "manche_no_result": "Manche sans resultat",
         "manche_end_log": "Fin de la manche {manche} ({fin}) — score : {score}",
@@ -193,7 +183,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "draw_word": "nulle",
         "team_word": "equipe {equipe}",
         "manche_result_line": "Manche {manche} : {qui} — {reason}",
-        "riposte_recap": "riposte de l'equipe {equipe} (a nommer : « {signal} ») :",
+
         "attempt_line": "{nom} : « {reponse} » -> {verdict}",
         "unmasked_word": "DEMASQUE",
         "wrong_word": "rate",

@@ -71,7 +71,6 @@ def new_round(state: GameState) -> None:
     state.centers_played = 0
     state.finished = False
     state.outcome = None
-    state.comeback_team = None
 
     deck = build_deck(state.config.num_ranks)
     state.rng_cards.shuffle(deck)
@@ -365,55 +364,12 @@ def discussion_phase(state: GameState, agents: dict) -> None:
             return
 
 
-def riposte_phase(state: GameState, agents: dict) -> None:
-    """Last resort comeback: the team that just conceded a KEMPS attempts to name the opposing signal.
-
-    Its 2 players answer; a single correct answer reverses the match.
-    """
-    state.phase = "RIPOSTE"
-    team = state.comeback_team
-    rules._log(state, "SYSTEM", None, t(state.config.lang, "riposte_intro", equipe=team))
-    responses: dict[int, str] = {}
-    for pid in state.team_players(team):
-        view = view_for(state, pid, full_chat=True)
-        guess = agents[pid].guess_signal(view)
-        responses[pid] = guess.response
-        rules.step(state, "RIPOSTE", pid,
-                   t(state.config.lang, "riposte_attempt", nom=state.players[pid].name),
-                   private=guess.response,
-                   **_extras_decision(view, agents[pid], f"SIGNAL_ADVERSE='{guess.response}'"))
-
-    # Semantic LLM Judge
-    responses_found = {}
-    evaluator = agents.get("evaluateur")
-    opposing_signal = state.signals.get(1 - team, "")
-    opposing_trigger = state.triggers.get(1 - team, "")
-    for pid, response in responses.items():
-        if not response.strip():
-            responses_found[pid] = False
-            continue
-        try:
-            if evaluator is not None:
-                responses_found[pid] = evaluator.judge_comeback(opposing_signal, opposing_trigger, response)
-            else:
-                raise ValueError("No dedicated evaluator agent configured")
-        except Exception:
-            # Deterministic fallback on API error (quota, timeout...)
-            from .engine import signaux
-            responses_found[pid] = (signaux.signal_found(opposing_signal, response)
-                                     or signaux.signal_found(opposing_trigger, response))
-
-    rules.resolve_comeback(state, responses, responses_found)
-
-
 def play_manche(state: GameState, agents: dict) -> None:
     while not state.finished:
         exchange_phase(state, agents)
         if state.finished:
             break
         discussion_phase(state, agents)
-        if state.comeback_team is not None:
-            riposte_phase(state, agents)
         rules.check_end(state)
         if not state.finished:
             state.turn += 1
@@ -423,6 +379,11 @@ def play_manche(state: GameState, agents: dict) -> None:
 def play_game(config: Config, models: list[str], agents: dict, on_event=None) -> GameState:
     """Plays a MATCH: successive rounds until `points_to_win`."""
     state = setup(config, models)
+    for i, p in enumerate(state.players):
+        if i in agents:
+            client = getattr(agents[i], "client", None)
+            if client is not None and hasattr(client, "model"):
+                p.model = client.model
     if on_event is not None:
         for ev in state.public_log:
             on_event(ev, state)

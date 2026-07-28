@@ -256,6 +256,14 @@
     <!-- KPIs -->
     <section class="kpis" id="kpis"></section>
 
+    <!-- VICTORY RATES -->
+    <section class="panel">
+      <div class="eyebrow sec-eyebrow">Performance metric</div>
+      <h2>Victory rate by model</h2>
+      <p class="desc">Share of match victories by model (ordered from best to worst).</p>
+      <div class="det" id="win-rates"></div>
+    </section>
+
     <!-- TRANSMISSION (hero chart) -->
     <section class="panel">
       <div class="eyebrow sec-eyebrow">Product metric #1</div>
@@ -343,8 +351,10 @@
   const mockData = {
     nb_parties: 20, nb_episodes: 34, tokens_total: 987400,
     par_modele: {
+      'gpt-4o':                  { total: 20, transmission_minorant: 0.75, transmission_borne_haute: 0.90, etats: { reconnu: 15, parle_sans_reconnaissance: 3, jamais_parle: 2 } },
+      'gemini-flash-lite-latest': { total: 16, transmission_minorant: 0.625, transmission_borne_haute: 0.8125, etats: { reconnu: 10, parle_sans_reconnaissance: 3, jamais_parle: 3 } },
       'mistral-small-latest':     { total: 18, transmission_minorant: 0.4444, transmission_borne_haute: 0.7222, etats: { reconnu: 8, parle_sans_reconnaissance: 5, jamais_parle: 5 } },
-      'gemini-flash-lite-latest':  { total: 16, transmission_minorant: 0.6250, transmission_borne_haute: 0.8125, etats: { reconnu: 10, parle_sans_reconnaissance: 3, jamais_parle: 3 } },
+      'claude-3-opus':            { total: 10, transmission_minorant: 0.50, transmission_borne_haute: 0.70, etats: { reconnu: 5, parle_sans_reconnaissance: 2, jamais_parle: 3 } }
     },
     funnel: [
       { label: 'Four-of-a-kind formed',  n: 34 },
@@ -354,8 +364,16 @@
       { label: 'Caught by teammate',     n: 11 },
     ],
     detection_par_modele: {
-      'mistral-small-latest':    { reussies: 5, total: 7 },
+      'gpt-4o':                  { reussies: 8, total: 10 },
       'gemini-flash-lite-latest': { reussies: 2, total: 5 },
+      'mistral-small-latest':     { reussies: 5, total: 7 },
+      'claude-3-opus':            { reussies: 3, total: 6 },
+    },
+    victoires_par_modele: {
+      'gpt-4o':                  { victoires: 14, nuls: 1, total: 15, taux: 0.9333 },
+      'gemini-flash-lite-latest': { victoires: 9, nuls: 2, total: 16, taux: 0.5625 },
+      'mistral-small-latest':     { victoires: 8, nuls: 2, total: 20, taux: 0.40 },
+      'claude-3-opus':            { victoires: 3, nuls: 1, total: 10, taux: 0.30 }
     },
     detail_parties: [
       { seed: 1000, tokens_total: 46200 }, { seed: 1001, tokens_total: 51800 },
@@ -370,13 +388,13 @@
       { seed: 1018, tokens_total: 47900 }, { seed: 1019, tokens_total: 53100 }
     ],
     codes_inventes: [
-      { signal: 'Kezako',                modele: 'mistral-small-latest', busted: false },
-      { signal: 'the cat\'s asleep',     modele: 'gemini-flash-lite-latest',  busted: false },
+      { signal: 'okay',                  modele: 'gpt-4o', busted: false },
+      { signal: 'the weather is nice today.', modele: 'mistral-small-latest', busted: false },
       { signal: 'Zorblax',               modele: 'mistral-small-latest', busted: true  },
       { signal: 'between us, honestly',  modele: 'gemini-flash-lite-latest',  busted: false },
       { signal: 'quiet day ☀️',          modele: 'gemini-flash-lite-latest',  busted: true  },
-      { signal: 'Glibberflax',           modele: 'mistral-small-latest', busted: false },
-      { signal: '🎲 tonight',            modele: 'mistral-small-latest', busted: true  },
+      { signal: 'the clouds are heavy',  modele: 'claude-3-opus', busted: true  },
+      { signal: 'I see what you mean',   modele: 'gpt-4o', busted: false },
       { signal: 'as usual',              modele: 'gemini-flash-lite-latest',  busted: false },
     ],
   };
@@ -403,7 +421,7 @@
       badge.style.background = 'var(--warn-bg)';
       badge.style.color = 'var(--warn-ink)';
       sub.innerHTML = `A layout mockup to validate the <b>shape</b> of the charts before running the real batch.
-        Made-up numbers, populated as if a second model (Gemini) were plugged in — to preview the model-vs-model duel too.`;
+        Made-up numbers, populated as if multiple models were plugged in — to preview the model-vs-model duel too.`;
       strip.style.display = 'flex';
       strip.innerHTML = `<b>⚠ PREVIEW</b>
         <span>None of these values come from a real game. They illustrate the layout <code style="font-family:var(--font-mono)">kems.batch</code> will produce once the batch games have been played. Run <code style="font-family:var(--font-mono)">python -m kems.batch</code> to generate real data.</span>`;
@@ -441,6 +459,29 @@
         <div class="k-num">${k.num}${k.unit ? '<span class="unit">' + k.unit + '</span>' : ''}</div>
         <div class="k-sub">${k.sub}</div>
       </div>`).join('');
+
+    // ---------- Victory Rates ----------
+    const winRatesHost = document.getElementById('win-rates');
+    const winEntries = Object.entries(data.victoires_par_modele || {});
+    winEntries.sort((a, b) => b[1].taux - a[1].taux);
+    
+    if (winEntries.length) {
+      winRatesHost.innerHTML = winEntries.map(([model, wData], i) => {
+        const r = wData.taux, w = pct(r);
+        const col = r >= 0.6 ? 'var(--st-reconnu)' : (r >= 0.4 ? 'var(--st-parle)' : 'var(--st-jamais)');
+        return `<div class="det-row">
+          <div class="det-top">
+            <span class="det-name">${model}</span>
+            <span class="det-val">${w}% <span style="color:var(--muted)">(${wData.victoires}/${wData.total} wins, ${wData.nuls} draws)</span></span>
+          </div>
+          <div class="det-track">
+            <div class="det-fill" style="width:${w}%;background:${col};animation:grow-x .6s ${0.15 + i * 0.1}s both cubic-bezier(.2,.7,.3,1)"></div>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      winRatesHost.innerHTML = `<p class="vide">No victory rate data available.</p>`;
+    }
 
     // ---------- Legend ----------
     const states = [

@@ -140,11 +140,13 @@ def prompt_negotiation(view: PlayerView) -> tuple[str, str]:
 def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
     # Est-ce que le signal precedent a ete brule/demasque ?
     brule = False
+    perdu_derniere_manche = False
     if view.round_history:
         derniere = view.round_history[-1]
-        rip = derniere.get("riposte")
-        if rip and rip.get("reussie", False) and rip.get("equipe") != view.team:
+        if derniere.get("kind") == "COUNTER" and derniere.get("success") and derniere.get("winner_team") != view.team:
             brule = True
+        if derniere.get("winner_team") is not None and derniere.get("winner_team") != view.team:
+            perdu_derniere_manche = True
 
     consigne_signal = ""
     if brule:
@@ -154,9 +156,13 @@ def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
         )
     else:
         consigne_signal = (
-            "Votre message secret precedent is toujours valide. Cependant, pour eviter que les adversaires "
-            "ne finissent par le comprendre a force de vous observer, vous pouvez decider de le conserver ou "
-            "de le changer/faire tourner de maniere proactive."
+            "Votre message secret precedent est toujours valide."
+        )
+
+    consigne_perte = ""
+    if perdu_derniere_manche:
+        consigne_perte = (
+            "Votre equipe a perdu la manche precedente.\n"
         )
 
     system = (
@@ -164,6 +170,7 @@ def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
         "La manche vient de se terminer. Tu discutes en prive avec ton coequipier pour debriefer la manche, "
         "ajuster votre strategie, et convenir de votre MESSAGE SECRET pour la manche suivante.\n"
         f"{consigne_signal}\n"
+        f"{consigne_perte}"
         "Profitez de cet echange pour egalement mettre a jour votre PLAN / STRATEGIE PERSISTANT personnel.\n\n"
         "Reponds sur ces lignes :\n"
         "MESSAGE: <ce que tu dis a ton coequipier>\n"
@@ -173,9 +180,17 @@ def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
         "PLAN: <ton plan et ta strategie privee pour la manche suivante, max 3 lignes>"
     )
     dialogue = "\n".join(view.my_team_chat) if view.my_team_chat else "(debut du debriefing de cette manche)"
+    chat_log = ""
+    if perdu_derniere_manche:
+        chat_log = (
+            "━━ MESSAGES PUBLICS DE LA MANCHE TERMINEE ━━\n"
+            f"{_fmt_chat_messages(view.global_chat, view.round)}\n"
+        )
+
     user = (
         "━━ CONTEXTE DU MATCH ━━\n"
         f"{_fmt_historique(view)}\n"
+        f"{chat_log}"
         "━━ VOTRE DISCUSSION PRIVEE DE DEBRIEFING ━━\n"
         f"{dialogue}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -251,7 +266,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         "CONSIGNES CONCERNANT LE CARRE :\n"
         f"{consigne}\n\n"
         "DEFINITION DES OPTIONS D'APPEL :\n"
-        "- KEMPS : Appelle uniquement si tu penses que TON COEQUIPIER a un carre. Gagne s'il en a un, perd sinon.\n"
+        "- KEMPS : Appelle uniquement si tu penses que TON COEQUIPIER a un carre. Gagne s'il en a un, perd sinon. N'appelle jamais KEMPS contre tes adversaires.\n"
         "- COUNTER : Appelle uniquement si tu penses qu'un ADVERSAIRE a un carre. Gagne s'il en a un, perd sinon. N'appelle jamais COUNTER contre ton coequipier.\n"
         "- NONE : Aucun appel ce tour-ci.\n\n"
         "Reponds sur ces lignes :\n"
@@ -278,24 +293,6 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
     return system, user
 
 
-# ─────────────────────────── macro : riposte (demasquer le signal adverse) ────────
-def prompt_riposte(view: PlayerView) -> tuple[str, str]:
-    system = (
-        "Tu viens de perdre : l'equipe adverse a reussi son KEMPS. Ses deux joueurs s'etaient donc "
-        "transmis, dans le chat public que tu as sous les yeux, un message secret convenu a l'avance. "
-        "Derniere chance : si tu retrouves lequel c'etait, ton equipe gagne malgre tout."
-    )
-    user = (
-        "━━ TOUT LE CHAT PUBLIC ━━\n"
-        f"{_fmt_chat_messages(view.global_chat, view.round, limit=100)}\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"ADVERSAIRES : {' et '.join(view.opponents)}\n\n"
-        "Reponds sur ces lignes :\n"
-        "RAISONNEMENT: <1 phrase>\n"
-        "SIGNAL_ADVERSE: <leur message secret, le plus precisement possible>"
-    )
-    return system, user
-
 
 # ─────────────────────────── juge : le signal a-t-il vraiment ete transmis ? (mesure seulement) ────
 def prompt_judge_signal(convention: str, trigger: str, texte: str) -> tuple[str, str]:
@@ -319,28 +316,6 @@ def prompt_judge_signal(convention: str, trigger: str, texte: str) -> tuple[str,
     )
     return system, user
 
-
-# ─────────────────────────── juge : la riposte adverse est-elle correcte ? ────
-def prompt_judge_riposte(convention: str, trigger: str, reponse: str) -> tuple[str, str]:
-    """Evaluateur de riposte : juge si la reponse adverse a demasque le signal sémantiquement."""
-    system = (
-        "Tu es un arbitre de Kems. Ton role est de juger si un joueur a demasque le message secret "
-        "de l'equipe adverse. L'equipe adverse avait convenu d'une convention/signal. Le joueur adverse "
-        "a tente une reponse pour nommer ce signal. Evalue s'ils ont correctement identifie et compris "
-        "le secret semantiquement (meme s'il y a des paraphrases, des explications, des synonymes, ou s'ils "
-        "decrivent correctement la structure du signal comme la ponctuation ou les emojis).\n"
-        "Reponds UNIQUEMENT par 'SIGNAL: OUI' ou 'SIGNAL: NON' apres un bref raisonnement."
-    )
-    user = (
-        f"CONVENTION SECRETE ADVERSE : {convention}\n"
-        f"DECLENCHEUR DU SIGNAL : {trigger}\n"
-        f"TENTATIVE DE REPONSE DU JOUEUR : {reponse}\n\n"
-        "L'adversaire a-t-il compris/demasque le signal secret ?\n"
-        "Reponds sur ces lignes :\n"
-        "RAISONNEMENT: <1 phrase>\n"
-        "SIGNAL: OUI ou NON"
-    )
-    return system, user
 
 
 def prompt_discussion_brain(view: PlayerView) -> tuple[str, str]:
@@ -379,7 +354,7 @@ def prompt_discussion_brain(view: PlayerView) -> tuple[str, str]:
         "CONSIGNES CONCERNANT LE CARRE :\n"
         f"{consigne}\n\n"
         "DEFINITION DES OPTIONS D'APPEL :\n"
-        "- KEMPS : Décide ceci uniquement si tu penses que TON COEQUIPIER a un carre. Gagne s'il en a un, perd sinon.\n"
+        "- KEMPS : Décide ceci uniquement si tu penses que TON COEQUIPIER a un carre. Gagne s'il en a un, perd sinon. Ne décide jamais KEMPS contre tes adversaires.\n"
         "- COUNTER : Décide ceci uniquement si tu penses qu'un ADVERSAIRE a un carre. Gagne s'il en a un, perd sinon. Ne décide jamais COUNTER contre ton coequipier.\n"
         "- NONE : Aucun appel ce tour-ci.\n\n"
         "Reponds sur ces lignes :\n"

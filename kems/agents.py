@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .engine.actions import Call, Guess, Nego
+from .engine.actions import Call, Nego
 from .engine.views import PlayerView
 from .llm import parse, prompts
 from .llm.client import LLMClient
@@ -24,14 +24,12 @@ class Agent:
     def decide_discussion(self, view: PlayerView) -> tuple[str, Call, str]:
         raise NotImplementedError
 
-    def guess_signal(self, view: PlayerView) -> Guess:
-        raise NotImplementedError
+
 
     def judge_signal(self, convention: str, trigger: str, text: str) -> bool:
         raise NotImplementedError
 
-    def judge_comeback(self, convention: str, trigger: str, response: str) -> bool:
-        raise NotImplementedError
+
 
 
 class LLMAgent(Agent):
@@ -91,16 +89,8 @@ class LLMAgent(Agent):
         
         return parse.parse_discussion(executor_res, view)
 
-    def guess_signal(self, view: PlayerView) -> Guess:
-        return parse.parse_riposte(self._ask(prompts.prompt_riposte(view, self.lang), pid=view.pid))
-
     def judge_signal(self, convention: str, trigger: str, text: str) -> bool:
         """Measurement judgment (pure measurement, no effect on the game): was the signal
         understood beyond literal matching? See CLAUDE.md."""
         return parse.parse_judgment(
             self._ask(prompts.prompt_judge_signal(convention, trigger, text, self.lang)))
-
-    def judge_comeback(self, convention: str, trigger: str, response: str) -> bool:
-        """Calls the LLM Judge to evaluate if the opponent's comeback is semantically correct."""
-        return parse.parse_judgment(
-            self._ask(prompts.prompt_judge_riposte(convention, trigger, response, self.lang)))

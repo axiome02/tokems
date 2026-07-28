@@ -71,7 +71,7 @@ def test_extraire_tout_produces_episodes_and_codes():
 
 def test_agreger_keeps_all_three_states():
     dumps = [{
-        "partie": {"tokens_total": 0, "nb_ripostes": 0, "ripostes_reussies": 0,
+        "partie": {"tokens_total": 0, "nb_counters": 0, "counters_reussis": 0,
                    "appels_sans_signal": 0, "emissions_sans_carre": 0},
         "episodes": [
             {"etat": RECOGNIZED, "modele": "m"},
@@ -86,9 +86,9 @@ def test_agreger_keeps_all_three_states():
     assert r["transmission_borne_haute"] == 0.5
 
 
-def test_agreger_opponent_detection_rate_from_ripostes():
+def test_agreger_opponent_detection_rate_from_counters():
     dumps = [{
-        "partie": {"tokens_total": 0, "nb_ripostes": 2, "ripostes_reussies": 1,
+        "partie": {"tokens_total": 0, "nb_counters": 2, "counters_reussis": 1,
                    "appels_sans_signal": 0, "emissions_sans_carre": 0},
         "episodes": [],
     }]
@@ -110,7 +110,7 @@ def test_regenerer_writes_csv_and_summary(tmp_path):
     games.mkdir()
     dump = {
         "seed": 3, "interrompu": False,
-        "partie": {"seed": 3, "tokens_total": 5, "nb_ripostes": 0, "ripostes_reussies": 0,
+        "partie": {"seed": 3, "tokens_total": 5, "nb_counters": 0, "counters_reussis": 0,
                    "appels_sans_signal": 0, "emissions_sans_carre": 0, "nb_episodes": 1},
         "episodes": [{"seed": 3, "etat": RECOGNIZED, "modele": "mistral", "capte": True}],
         "codes": [{"seed": 3, "equipe": 0, "modele": "mistral", "signal": "kezako",
@@ -126,3 +126,23 @@ def test_regenerer_writes_csv_and_summary(tmp_path):
     saved = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert saved["nb_parties"] == 1
     assert resume["transmission_minorant"] == 1.0
+
+
+def test_charger_dumps_migrates_old_riposte_keys(tmp_path):
+    games = tmp_path / "games"
+    games.mkdir()
+    dump = {
+        "seed": 3,
+        "partie": {"seed": 3, "nb_ripostes": 2, "ripostes_reussies": 1},
+    }
+    (games / "3.json").write_text(json.dumps(dump), encoding="utf-8")
+
+    loaded = batch._charger_dumps(str(games))
+    assert len(loaded) == 1
+    p = loaded[0]["partie"]
+    assert "nb_counters" in p
+    assert p["nb_counters"] == 2
+    assert "counters_reussis" in p
+    assert p["counters_reussis"] == 1
+    assert "nb_ripostes" not in p
+    assert "ripostes_reussies" not in p

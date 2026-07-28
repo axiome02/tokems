@@ -77,20 +77,19 @@ def test_single_episode_per_player_and_round():
     assert len(state.episodes) == 1
 
 
-def test_comeback_marks_episode_unmasked():
+def test_counter_marks_episode_unmasked():
     state = _state()
-    rules.set_signal(state, 0, "the phrase of the cat", trigger="the cat is sleeping")
     rules.open_episode(state, 2)
     _emettre(state)
-    rules.resolve_calls(state, {0: Call("KEMPS")}, [0])
-    rules.resolve_comeback(state, {1: "the cat is sleeping", 3: "nothing"})
+    # Player 1 (team 1) calls COUNTER on team 0. Player 2 has the square.
+    rules.resolve_calls(state, {1: Call("COUNTER")}, [1])
     assert state.episodes[0]["unmasked"] is True
 
 
-def test_failed_comeback_marks_episode_not_unmasked():
+def test_failed_counter_marks_episode_not_unmasked():
     state = _state()
     rules.open_episode(state, 2)
     _emettre(state)
+    # Player 0 calls KEMPS. Team 0's Player 2 has a square. Since KEMPS succeeds and no COUNTER is called, it is not unmasked.
     rules.resolve_calls(state, {0: Call("KEMPS")}, [0])
-    rules.resolve_comeback(state, {1: "the weather", 3: "nothing"})
     assert state.episodes[0]["unmasked"] is False

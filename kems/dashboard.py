@@ -113,19 +113,7 @@ def _instantane(state: GameState, tokens: dict | None, en_cours: bool,
                 "success": o.get("success"),
                 "signal_actually_emitted": o.get("signal_actually_emitted"),
                 "signal_actually_emitted_llm": o.get("signal_actually_emitted_llm"),
-                "riposte": {
-                    "equipe": o["riposte"].get("team"),
-                    "signal_adverse": o["riposte"].get("opposing_signal"),
-                    "tentatives": [
-                        {
-                            "pid": tt["pid"],
-                            "reponse": tt["response"],
-                            "trouve": tt["found"],
-                        }
-                        for tt in o["riposte"].get("attempts", [])
-                    ],
-                    "reussie": o["riposte"].get("success"),
-                } if o.get("riposte") else None
+                "riposte": None
             }
             for o in state.round_history
         ],
@@ -219,10 +207,23 @@ class Pilote:
 
     def _jouer(self, reglages: dict) -> None:
         from .run import jouer_partie
+        from .batch import extraire_tout, GAMES_DIR, RESULTS_DIR, regenerer
+        import json as _json
         try:
             res = jouer_partie(reglages, self.publieur)
             if res.get("interrompu"):
                 self.erreur = f"Game Interrupted: {res['interrompu']}"
+            # Save to analytics automatically, just like batch does
+            state, usage = res.get("state"), res.get("usage", {})
+            if state is not None:
+                seed = state.config.master_seed
+                import os as _os
+                _os.makedirs(GAMES_DIR, exist_ok=True)
+                cible = _os.path.join(GAMES_DIR, f"{seed}.json")
+                dump = extraire_tout(state, usage, seed, interrompu=bool(res.get("interrompu")))
+                with open(cible, "w", encoding="utf-8") as f:
+                    _json.dump(dump, f, ensure_ascii=False, indent=2)
+                regenerer(RESULTS_DIR)
         except Exception as e:                     # noqa: BLE001
             self.erreur = f"{type(e).__name__} : {e}"
 
@@ -275,7 +276,7 @@ class Pilote:
                 partie_reglages["seed"] = seed
                 partie_reglages["out"] = os.path.join("transcripts", "batch", f"game_{seed}.txt")
                 
-                res = jouer_partie(partie_reglages)
+                res = jouer_partie(partie_reglages, self.publieur)
                 state, usage = res["state"], res["usage"]
                 if state is not None:
                     dump = extraire_tout(state, usage, seed, interrompu=bool(res.get("interrompu")))

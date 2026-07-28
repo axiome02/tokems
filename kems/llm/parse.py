@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from ..engine.actions import Call, Guess, Nego, Pass, Take
+from ..engine.actions import Call, Nego, Pass, Take
 from ..engine.views import PlayerView
 
 
@@ -80,16 +80,6 @@ def parse_discussion(text: str, view: PlayerView) -> tuple[str, Call, str]:
 
     plan = _line(text, "PLAN") or view.my_plan
     return msg, Call(kind), plan
-
-
-def parse_riposte(text: str) -> Guess:
-    """'SIGNAL_ADVERSE: ☀️' (or 'OPPONENT_SIGNAL:') -> Guess. Fallback: the last non-empty line."""
-    brut = (_line(text, "SIGNAL_ADVERSE") or _line(text, "OPPONENT_SIGNAL")
-            or _line(text, "SIGNAL"))
-    if brut is None:
-        lines = [l for l in (text or "").splitlines() if l.strip()]
-        brut = lines[-1] if lines else ""
-    return Guess(response=_clean(brut))
 
 
 def parse_judgment(text: str) -> bool:

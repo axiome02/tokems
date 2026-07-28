@@ -33,9 +33,3 @@ class Nego:
     agree: bool
     plan: str | None = None      # personal plan / memory (optional)
 
-
-@dataclass
-class Guess:
-    """Comeback (riposte): a player's answer when asked for the opponents' secret signal."""
-
-    response: str

@@ -76,39 +76,27 @@ def test_new_round_redistributes_without_clearing_chat():
     assert len(state.public_log) > lines_before      # public chat is never cleared
 
 
-def test_signal_burned_only_after_successful_comeback():
+def test_signal_burned_only_after_successful_counter():
     state = _state()
     rules.set_signal(state, 0, "☀️")
-    state.hands[2] = [Card(5, c) for c in SUITS]
-    rules._log(state, "MESSAGE", 2, "Player 3: « nice evening ☀️ »")   # arm the call
-    rules.resolve_calls(state, {0: Call("KEMPS")}, [0])
-    rules.resolve_comeback(state, {1: "the emoji ☀️", 3: "nothing"})
+    state.hands[2] = [Card(5, c) for c in SUITS]  # Player 2 (team 0) has a square
+    # Player 1 (team 1) calls COUNTER on Team 0
+    rules.resolve_calls(state, {1: Call("COUNTER")}, [1])
     rules.close_round(state)
-    assert rules.signal_burned(state, 0) is True      # team 0 got unmasked
+    assert rules.signal_burned(state, 0) is True      # team 0 got countered/unmasked
     assert rules.signal_burned(state, 1) is False
-    assert state.scores == {0: 0, 1: 1}              # comeback reversed the round winner
+    assert state.scores == {0: 0, 1: 1}              # team 1 wins
 
 
-def test_signal_not_burned_if_comeback_fails():
+def test_signal_not_burned_if_counter_fails():
     state = _state()
     rules.set_signal(state, 0, "☀️")
-    state.hands[2] = [Card(5, c) for c in SUITS]
-    rules._log(state, "MESSAGE", 2, "Player 3: « nice evening ☀️ »")   # arm the call
-    rules.resolve_calls(state, {0: Call("KEMPS")}, [0])
-    rules.resolve_comeback(state, {1: "the weather", 3: "nothing"})
+    # no one has a square
+    # Player 1 (team 1) calls COUNTER
+    rules.resolve_calls(state, {1: Call("COUNTER")}, [1])
     rules.close_round(state)
     assert rules.signal_burned(state, 0) is False
-    assert state.scores == {0: 1, 1: 0}
-
-
-def test_failed_comeback_does_not_reveal_signal_in_public_chat():
-    state = _state()
-    rules.set_signal(state, 0, "pineapple")
-    state.hands[2] = [Card(5, c) for c in SUITS]
-    rules.resolve_calls(state, {0: Call("KEMPS")}, [0])
-    rules.resolve_comeback(state, {1: "banana", 3: "cherry"})
-    # match continues: real signal must not appear anywhere in the chat
-    assert not any("pineapple" in ev.text for ev in state.public_log)
+    assert state.scores == {0: 1, 1: 0}              # team 0 wins because COUNTER failed
 
 
 def test_drawn_round_does_not_loop_if_max_rounds_is_1():

@@ -96,14 +96,7 @@ def rendre(state: GameState, usage: dict | None = None) -> str:
         qui = t(lang, "draw_word") if w is None else t(lang, "team_word", equipe=w)
         L.append("    " + t(lang, "manche_result_line", manche=o.get("round", "?"), qui=qui,
                              reason=o.get("reason", "?")))
-        r = o.get("riposte")
-        if r:
-            L.append("        " + t(lang, "riposte_recap", equipe=r["team"],
-                                     signal=r["opposing_signal"]))
-            for tt in r["attempts"]:
-                verdict = t(lang, "unmasked_word") if tt["found"] else t(lang, "wrong_word")
-                L.append("          " + t(lang, "attempt_line", nom=state.players[tt["pid"]].name,
-                                           reponse=tt["response"], verdict=verdict))
+
 
     L.append("-" * 64)
     L.append(f"  {t(lang, 'final_score', s0=state.scores[0], s1=state.scores[1])}")

@@ -21,7 +21,7 @@ class Event:
     """A line in the global PUBLIC chat (action, message, call, system)."""
 
     turn: int
-    type: str            # SWAP | PASS | MESSAGE | CALL | SWEEP | RIPOSTE | SYSTEM
+    type: str            # SWAP | PASS | MESSAGE | CALL | SWEEP | SYSTEM
     pid: int | None
     text: str
     round: int = 1
@@ -77,9 +77,6 @@ class GameState:
 
     finished: bool = False
     outcome: dict | None = None
-
-    # team that just conceded a successful KEMPS and has the right to a comeback/riposte (None = no comeback)
-    comeback_team: int | None = None
 
     # optional callback called on each public event (for live printing)
     on_event: Callable | None = None

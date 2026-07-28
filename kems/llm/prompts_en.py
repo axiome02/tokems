@@ -138,11 +138,13 @@ def prompt_negotiation(view: PlayerView) -> tuple[str, str]:
 # ─────────────────────────── macro: team debriefing ───────────────────────
 def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
     burned = False
+    lost_last_round = False
     if view.round_history:
         last = view.round_history[-1]
-        rip = last.get("riposte")
-        if rip and rip.get("reussie", False) and rip.get("equipe") != view.team:
+        if last.get("kind") == "COUNTER" and last.get("success") and last.get("winner_team") != view.team:
             burned = True
+        if last.get("winner_team") is not None and last.get("winner_team") != view.team:
+            lost_last_round = True
 
     consigne_signal = ""
     if burned:
@@ -152,8 +154,13 @@ def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
         )
     else:
         consigne_signal = (
-            "Your previous secret message is still valid. However, to prevent opponents from "
-            "eventually figuring it out, you can choose to keep it or proactively change/rotate it."
+            "Your previous secret message is still valid."
+        )
+
+    consigne_lost = ""
+    if lost_last_round:
+        consigne_lost = (
+            "Your team lost the last round.\n"
         )
 
     system = (
@@ -161,6 +168,7 @@ def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
         "The round has just ended. You are talking privately with your teammate to debrief the round, "
         "adjust your strategy, and agree on your SECRET MESSAGE for the next round.\n"
         f"{consigne_signal}\n"
+        f"{consigne_lost}"
         "Use this exchange to also update your personal PERSISTENT PLAN / STRATEGY.\n\n"
         "Reply on these lines:\n"
         "MESSAGE: <what you say to your teammate>\n"
@@ -170,9 +178,17 @@ def prompt_debriefing(view: PlayerView) -> tuple[str, str]:
         "PLAN: <your private plan and strategy for the next round, max 3 lines>"
     )
     dialogue = "\n".join(view.my_team_chat) if view.my_team_chat else "(start of debriefing for this round)"
+    chat_log = ""
+    if lost_last_round:
+        chat_log = (
+            "━━ PUBLIC MESSAGES OF THE COMPLETED ROUND ━━\n"
+            f"{_fmt_chat_messages(view.global_chat, view.round)}\n"
+        )
+
     user = (
         "━━ MATCH CONTEXT ━━\n"
         f"{_fmt_historique(view)}\n"
+        f"{chat_log}"
         "━━ YOUR PRIVATE DEBRIEFING DISCUSSION ━━\n"
         f"{dialogue}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -249,7 +265,7 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
         "SQUARE GUIDELINES:\n"
         f"{consigne}\n\n"
         "CALL OPTIONS DEFINITIONS:\n"
-        "- KEMPS: Call this ONLY if you believe YOUR TEAMMATE has a square. It wins if they do, and loses otherwise.\n"
+        "- KEMPS: Call this ONLY if you believe YOUR TEAMMATE has a square. It wins if they do, and loses otherwise. Never call KEMPS against your opponents.\n"
         "- COUNTER: Call this ONLY if you believe an OPPONENT has a square. It wins if they do, and loses otherwise. Never call COUNTER against your teammate.\n"
         "- NONE: No call this turn.\n\n"
         "Reply on these lines:\n"
@@ -276,25 +292,6 @@ def prompt_discussion(view: PlayerView) -> tuple[str, str]:
     return system, user
 
 
-# ─────────────────────────── macro: comeback (unmask the opponents' signal) ────────
-def prompt_riposte(view: PlayerView) -> tuple[str, str]:
-    system = (
-        "You just lost: the opposing team succeeded with their KEMPS. Their two players must "
-        "therefore have passed each other, in the public chat you have in front of you, a secret "
-        "message agreed on in advance. Last chance: if you figure out which one it was, your team "
-        "wins anyway."
-    )
-    user = (
-        "━━ ALL PUBLIC CHAT ━━\n"
-        f"{_fmt_chat_messages(view.global_chat, view.round, limit=100)}\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"OPPONENTS: {' and '.join(view.opponents)}\n\n"
-        "Reply on these lines:\n"
-        "REASONING: <1 sentence>\n"
-        "SIGNAL_ADVERSE: <their secret message, as precisely as possible>"
-    )
-    return system, user
-
 
 # ─────────────────────────── judge: was the signal actually conveyed? (measurement only) ────
 def prompt_judge_signal(convention: str, trigger: str, text: str) -> tuple[str, str]:
@@ -317,29 +314,6 @@ def prompt_judge_signal(convention: str, trigger: str, text: str) -> tuple[str, 
     )
     return system, user
 
-
-# ─────────────────────────── judge: is the opponents' comeback attempt correct? ────
-def prompt_judge_riposte(convention: str, trigger: str, response: str) -> tuple[str, str]:
-    """comeback grader: judge if the opponents' guess unmasked the signal semantically."""
-    system = (
-        "You are a neutral and impartial referee of Kems. Your role is to judge if a player "
-        "has successfully unmasked the opposing team's secret message. The opposing team had agreed "
-        "on a secret convention. The player attempted a guess to name that signal. "
-        "Evaluate if the player correctly identified and understood the secret semantically "
-        "(even if they use paraphrases, explanations, synonyms, or correctly describe the structure "
-        "of the signal such as punctuation or emojis).\n"
-        "Reply ONLY with 'SIGNAL: YES' or 'SIGNAL: NO' after a brief reasoning."
-    )
-    user = (
-        f"OPPOSING SECRET CONVENTION: {convention}\n"
-        f"SIGNAL TRIGGER: {trigger}\n"
-        f"PLAYER'S GUESS: {response}\n\n"
-        "Did the player understand/unmask the secret signal?\n"
-        "Reply on these lines:\n"
-        "REASONING: <1 explanatory sentence>\n"
-        "SIGNAL: YES or NO"
-    )
-    return system, user
 
 
 def prompt_discussion_brain(view: PlayerView) -> tuple[str, str]:
@@ -379,7 +353,7 @@ def prompt_discussion_brain(view: PlayerView) -> tuple[str, str]:
         "SQUARE GUIDELINES:\n"
         f"{consigne}\n\n"
         "CALL OPTIONS DEFINITIONS:\n"
-        "- KEMPS: Decide this ONLY if you believe YOUR TEAMMATE has a square. It wins if they do, and loses otherwise.\n"
+        "- KEMPS: Decide this ONLY if you believe YOUR TEAMMATE has a square. It wins if they do, and loses otherwise. Never decide KEMPS against your opponents.\n"
         "- COUNTER: Decide this ONLY if you believe an OPPONENT has a square. It wins if they do, and loses otherwise. Never decide COUNTER against your teammate.\n"
         "- NONE: No call this turn.\n\n"
         "Reply on these lines:\n"

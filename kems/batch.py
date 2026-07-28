@@ -1,7 +1,7 @@
 """Data collection: launches N games (multi-seeds) and aggregates the metrics.
 
 This layer does not touch the engine or LLMs: it only replays `jouer_partie` and reads the final
-`GameState` (episodes, round history, calls, comebacks...).
+`GameState` (episodes, round history, calls, counters...).
 
 Crash-safe and resumable: each game is dumped to `results/games/<seed>.json` as soon as it finishes.
 CSV files + summary are regenerated from these dumps.
@@ -62,7 +62,7 @@ def extraire_episodes(state, seed: int) -> list[dict]:
 
 def extraire_partie(state, usage: dict, seed: int) -> dict:
     """One row per game."""
-    ripostes = [m["riposte"] for m in state.round_history if m.get("riposte")]
+    counters = [m for m in state.round_history if m.get("kind") == "COUNTER"]
     appels_aveugles = state.calls_without_signal
     return {
         "seed": seed,
@@ -83,8 +83,8 @@ def extraire_partie(state, usage: dict, seed: int) -> dict:
         "appels_sans_signal": len(appels_aveugles),
         "appels_sans_signal_gagnants": sum(1 for a in appels_aveugles if a.get("winner")),
         "emissions_sans_carre": len(state.emissions_without_square),
-        "nb_ripostes": len(ripostes),
-        "ripostes_reussies": sum(1 for r in ripostes if r.get("success")),
+        "nb_counters": len(counters),
+        "counters_reussis": sum(1 for c in counters if c.get("success")),
     }
 
 
@@ -97,7 +97,7 @@ def extraire_codes(state, seed: int) -> list[dict]:
             continue
         # Check if the team's signal was unmasked during the match
         busted = any(
-            m.get("riposte") and m["riposte"].get("success") and m["riposte"].get("team") == 1 - team
+            m.get("kind") == "COUNTER" and m.get("success") and m.get("winner_team") == 1 - team
             for m in state.round_history
         )
         lignes.append({
@@ -138,9 +138,9 @@ def agreger(dumps: list[dict]) -> dict:
         etats[ep["etat"]] += 1
     n_ep = len(episodes)
 
-    # comebacks
-    n_ripostes = sum(p["nb_ripostes"] for p in parties)
-    n_ripostes_ok = sum(p["ripostes_reussies"] for p in parties)
+    # counters
+    n_counters = sum(p["nb_counters"] for p in parties)
+    n_counters_ok = sum(p["counters_reussis"] for p in parties)
 
     # by model holding the square
     par_modele: dict[str, dict] = {}
@@ -159,6 +159,34 @@ def agreger(dumps: list[dict]) -> dict:
             d["total"] += 1
             if ep["demasque"]:
                 d["reussies"] += 1
+
+    # Win rate by model
+    victoires_par_modele = {}
+    for p in parties:
+        m0 = p.get("modele_equipe_0")
+        m1 = p.get("modele_equipe_1")
+        vainqueur = p.get("vainqueur")
+        if vainqueur == "None" or vainqueur == "":
+            vainqueur = None
+        elif vainqueur == "0" or vainqueur == 0:
+            vainqueur = 0
+        elif vainqueur == "1" or vainqueur == 1:
+            vainqueur = 1
+            
+        if m0:
+            d = victoires_par_modele.setdefault(m0, {"victoires": 0, "nuls": 0, "total": 0})
+            d["total"] += 1
+            if vainqueur == 0:
+                d["victoires"] += 1
+            elif vainqueur is None:
+                d["nuls"] += 1
+        if m1:
+            d = victoires_par_modele.setdefault(m1, {"victoires": 0, "nuls": 0, "total": 0})
+            d["total"] += 1
+            if vainqueur == 1:
+                d["victoires"] += 1
+            elif vainqueur is None:
+                d["nuls"] += 1
 
     # signaling funnel
     funnel = [
@@ -179,8 +207,8 @@ def agreger(dumps: list[dict]) -> dict:
         "transmission_minorant": _taux(etats[RECOGNIZED], n_ep),
         "transmission_borne_haute": _taux(etats[RECOGNIZED] + etats[SPOKE_WITHOUT_RECOGNITION], n_ep),
         "etats_episodes": etats,
-        "detection_adverse": _taux(n_ripostes_ok, n_ripostes),
-        "nb_ripostes": n_ripostes,
+        "detection_adverse": _taux(n_counters_ok, n_counters),
+        "nb_counters": n_counters,
         "appels_sans_signal": sum(p["appels_sans_signal"] for p in parties),
         "emissions_sans_carre": sum(p["emissions_sans_carre"] for p in parties),
         "par_modele": {
@@ -192,6 +220,15 @@ def agreger(dumps: list[dict]) -> dict:
             for m, d in par_modele.items()
         },
         "detection_par_modele": det_par_modele,
+        "victoires_par_modele": {
+            m: {
+                "victoires": d["victoires"],
+                "nuls": d["nuls"],
+                "total": d["total"],
+                "taux": d["victoires"] / d["total"] if d["total"] > 0 else 0.0
+            }
+            for m, d in victoires_par_modele.items()
+        },
         "funnel": funnel,
         "detail_parties": [{
             "seed": p.get("seed", 0),
@@ -223,7 +260,14 @@ def _charger_dumps(games_dir: str = GAMES_DIR) -> list[dict]:
     for nom in sorted(os.listdir(games_dir)):
         if nom.endswith(".json"):
             with open(os.path.join(games_dir, nom), encoding="utf-8") as f:
-                dumps.append(json.load(f))
+                d = json.load(f)
+                if "partie" in d:
+                    p = d["partie"]
+                    if "nb_ripostes" in p:
+                        p["nb_counters"] = p.pop("nb_ripostes")
+                    if "ripostes_reussies" in p:
+                        p["counters_reussis"] = p.pop("ripostes_reussies")
+                dumps.append(d)
     return dumps
 
 
